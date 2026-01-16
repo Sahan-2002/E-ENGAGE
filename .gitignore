@@ -3,3 +3,10 @@ __pycache__/
 venv/
 node_modules/
 .DS_Store
+
+# Datasets
+dataset/face_expression/
+dataset/*.zip
+
+# CV cache
+__pycache__/
