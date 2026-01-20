@@ -6,7 +6,10 @@ node_modules/
 
 # Datasets
 dataset/face_expression/
-dataset/*.zip
+dataset/face_recognition/
+dataset/training/cv_features.csv
 
 # CV cache
 __pycache__/
+
+

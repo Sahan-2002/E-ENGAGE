@@ -1,10 +1,14 @@
 import csv
 import os
-from fusion import calculate_engagement_score
+import time
+from .fusion import run_fusion
+from ..cv.extract_features import get_cv_features
+from ..hci.features import get_hci_features
 
 DATASET_PATH = "dataset/training/engagement_data.csv"
 
 HEADER = [
+    "timestamp",
     "face_detected",
     "eye_openness",
     "head_pose",
@@ -15,12 +19,16 @@ HEADER = [
     "label"
 ]
 
-def save_record(cv, hci):
+
+def save_record():
     os.makedirs(os.path.dirname(DATASET_PATH), exist_ok=True)
 
-    result = calculate_engagement_score(cv, hci)
+    cv = get_cv_features()
+    hci = get_hci_features()
+    result = run_fusion()
 
     row = [
+        time.time(),
         cv["face_detected"],
         cv["eye_openness"],
         cv["head_pose"],
@@ -43,17 +51,4 @@ def save_record(cv, hci):
 
 
 if __name__ == "__main__":
-    # SAMPLE DATA (replace with live values later)
-    cv_features = {
-        "face_detected": 1,
-        "eye_openness": 0.0318,
-        "head_pose": 1
-    }
-
-    hci_features = {
-        "typing_speed": 77.8,
-        "mouse_activity": 451,
-        "idle_time": 0.01
-    }
-
-    save_record(cv_features, hci_features)
+    save_record()

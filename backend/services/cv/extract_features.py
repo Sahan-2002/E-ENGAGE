@@ -63,3 +63,53 @@ if __name__ == "__main__":
     )
 
     print(extract_facial_features(sample_image))
+
+def get_cv_features():
+    """
+    Returns CV features in the format required by ML
+    """
+    # If you already extract features from webcam / image
+    # call that function here
+
+    features = extract_facial_features()  # ⚠️ adjust name if needed
+
+    return {
+        "face_detected": features.get("face_detected", 0),
+        "eye_openness": features.get("eye_openness", 0.0),
+        "head_pose": features.get("head_pose", 0)
+    }
+import cv2
+import tempfile
+import os
+
+def get_cv_features():
+    """
+    Capture one frame from webcam and extract CV features
+    """
+
+    cap = cv2.VideoCapture(0)
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+        return {
+            "face_detected": 0,
+            "eye_openness": 0.0,
+            "head_pose": 0
+        }
+
+    # Save frame temporarily
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        image_path = tmp.name
+        cv2.imwrite(image_path, frame)
+
+    features = extract_facial_features(image_path)
+
+    os.remove(image_path)
+
+    return {
+        "face_detected": features.get("face_detected", 0),
+        "eye_openness": features.get("eye_openness", 0.0),
+        "head_pose": features.get("head_pose", 0)
+    }
+

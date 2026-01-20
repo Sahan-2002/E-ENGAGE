@@ -1,17 +1,19 @@
+from ..hci.features import get_hci_features
+from ..cv.extract_features import get_cv_features
+
+
 def normalize(value, min_val, max_val):
     if max_val - min_val == 0:
         return 0
-    return (value - min_val) / (max_val - min_val)
+    return max(0, min(1, (value - min_val) / (max_val - min_val)))
 
 
 def calculate_engagement_score(cv, hci):
-    # Normalize features (example ranges)
     eye = normalize(cv["eye_openness"], 0.0, 0.05)
     typing = normalize(hci["typing_speed"], 0, 200)
     mouse = normalize(hci["mouse_activity"], 0, 500)
     idle = 1 - normalize(hci["idle_time"], 0, 10)
 
-    # Simple weighted fusion
     score = (
         0.3 * eye +
         0.3 * typing +
@@ -20,7 +22,6 @@ def calculate_engagement_score(cv, hci):
     )
 
     engagement_score = round(score * 100, 2)
-
     label = "Engaged" if engagement_score >= 60 else "Disengaged"
 
     return {
@@ -29,18 +30,11 @@ def calculate_engagement_score(cv, hci):
     }
 
 
+def run_fusion():
+    cv = get_cv_features()
+    hci = get_hci_features()
+    return calculate_engagement_score(cv, hci)
+
+
 if __name__ == "__main__":
-    cv_features = {
-        "face_detected": 1,
-        "eye_openness": 0.0318,
-        "head_pose": 1
-    }
-
-    hci_features = {
-        "typing_speed": 77.8,
-        "mouse_activity": 451,
-        "idle_time": 0.01
-    }
-
-    result = calculate_engagement_score(cv_features, hci_features)
-    print(result)
+    print(run_fusion())
