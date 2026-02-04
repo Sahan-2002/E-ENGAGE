@@ -21,7 +21,7 @@ def calculate_engagement_score(cv, hci):
         0.2 * idle
     )
 
-    engagement_score = round(score * 100, 2)
+    engagement_score = round(max(score * 100, 5), 2)
     label = "Engaged" if engagement_score >= 60 else "Disengaged"
 
     return {
@@ -30,11 +30,8 @@ def calculate_engagement_score(cv, hci):
     }
 
 
-def run_fusion():
-    cv = get_cv_features()
-    hci = get_hci_features()
-    return calculate_engagement_score(cv, hci)
-
-
+# Optional standalone test
 if __name__ == "__main__":
-    print(run_fusion())
+    sample_cv = {"face_detected": 1, "eye_openness": 0.03, "head_pose": 1}
+    sample_hci = {"typing_speed": 50, "mouse_activity": 100, "idle_time": 0.5}
+    print(calculate_engagement_score(sample_cv, sample_hci))

@@ -1,9 +1,11 @@
 import csv
 import os
 import time
-from .fusion import run_fusion
+from .fusion import calculate_engagement_score
 from ..cv.extract_features import get_cv_features
 from ..hci.features import get_hci_features
+
+
 
 DATASET_PATH = "dataset/training/engagement_data.csv"
 
@@ -25,7 +27,8 @@ def save_record():
 
     cv = get_cv_features()
     hci = get_hci_features()
-    result = run_fusion()
+    result = calculate_engagement_score(cv, hci)
+
 
     row = [
         time.time(),

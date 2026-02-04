@@ -1,7 +1,7 @@
 from pynput import keyboard, mouse
 import time
 
-def track_input(duration=20):
+def track_input(duration=5):
     key_count = 0
     mouse_count = 0
     last_activity_time = time.time()
