@@ -1,64 +1,53 @@
-// services/auth.js
+// frontend-ui/src/services/auth.js
+// Real JWT auth — stores token + user in localStorage
 
-const TOKEN_KEY = "eengage_token";
-const USER_KEY  = "eengage_user";
+const BASE = "http://127.0.0.1:8000";
 
-export function isAuthenticated() {
-  return !!localStorage.getItem(TOKEN_KEY);
+// ── Storage helpers ────────────────────────────────────────────────
+export function getToken()  { return localStorage.getItem("eengage_token"); }
+export function getUser()   {
+  try { return JSON.parse(localStorage.getItem("eengage_user")); }
+  catch { return null; }
+}
+export function isAuthenticated() { return !!getToken(); }
+export function isTeacher()       { return getUser()?.role === "teacher"; }
+export function isStudent()       { return getUser()?.role === "student"; }
+
+// ── Register ───────────────────────────────────────────────────────
+export async function register(name, email, password, role) {
+  const res = await fetch(`${BASE}/register`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ name, email, password, role }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Registration failed");
+
+  localStorage.setItem("eengage_token", data.token);
+  localStorage.setItem("eengage_user",  JSON.stringify(data.user));
+  return data;
 }
 
-export function getUser() {
-  const raw = localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+// ── Login ──────────────────────────────────────────────────────────
+export async function login(email, password) {
+  const res = await fetch(`${BASE}/login`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Invalid credentials");
+
+  localStorage.setItem("eengage_token", data.token);
+  localStorage.setItem("eengage_user",  JSON.stringify(data.user));
+  return data;
 }
 
-export function isTeacher() {
-  return getUser()?.role === "teacher";
-}
-
-export function isStudent() {
-  return getUser()?.role === "student";
-}
-
-export function login(token, user) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
+// ── Logout ─────────────────────────────────────────────────────────
 export function logout() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem("eengage_token");
+  localStorage.removeItem("eengage_user");
 }
 
-export async function loginWithCredentials(email, password) {
-  try {
-    const res = await fetch("http://127.0.0.1:8000/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      return { success: false, error: err.detail || "Login failed" };
-    }
-
-    const data = await res.json();
-    login(data.token, data.user);
-    return { success: true, user: data.user };
-
-  } catch {
-    // Fallback for when backend is not running
-    const fallback = {
-      "teacher@eengage.com": { password: "password123", name: "Dr. Smith",    role: "teacher" },
-      "student@eengage.com": { password: "student123",  name: "Alex Johnson", role: "student" },
-    };
-    const u = fallback[email];
-    if (u && u.password === password) {
-      const user = { email, name: u.name, role: u.role };
-      login("offline-token", user);
-      return { success: true, user };
-    }
-    return { success: false, error: "Invalid email or password" };
-  }
-}
+// ── Legacy alias (used in some components) ─────────────────────────
+export const loginWithCredentials = login;
