@@ -1,72 +1,119 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import { getUser } from "../services/auth";
 import {
   createClass, getMyClasses,
   startClassSession, stopClassSession, getClassSessionStatus,
+  getClassEngagement,
 } from "../services/api";
-import { Plus, Play, Square, BookOpen, Activity, Timer, AlertCircle } from "lucide-react";
+import {
+  Plus, Play, Square, BookOpen, Activity,
+  Timer, AlertCircle, Users, TrendingUp, Award,
+} from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend,
+} from "recharts";
+
+// ── Helpers ────────────────────────────────────────────────────────
+const LINE_COLORS = ["#3D7A5F","#2A6496","#C9963A","#8B5CF6","#EC4899","#0891B2"];
+
+function scoreColor(v) {
+  return v >= 70 ? "var(--success)" : v >= 50 ? "var(--warning)" : "var(--danger)";
+}
 
 function StatusPill({ active }) {
   return (
     <span style={{
-      display:"inline-flex", alignItems:"center", gap: 6,
-      padding:"4px 12px", borderRadius: 20, fontSize:"0.75rem", fontWeight: 700,
-      background: active ? "rgba(61,122,95,0.1)" : "rgba(148,163,184,0.1)",
-      color: active ? "var(--sage)" : "var(--text-muted)",
+      display:"inline-flex",alignItems:"center",gap:6,
+      padding:"4px 12px",borderRadius:20,fontSize:"0.75rem",fontWeight:700,
+      background:active?"rgba(61,122,95,0.1)":"rgba(148,163,184,0.1)",
+      color:active?"var(--sage)":"var(--text-muted)",
     }}>
       <span style={{
-        width: 7, height: 7, borderRadius:"50%",
-        background: active ? "var(--sage)" : "var(--border)",
-        animation: active ? "pulse 1.4s infinite" : "none",
-        boxShadow: active ? "0 0 0 3px rgba(61,122,95,0.2)" : "none",
-      }} />
+        width:7,height:7,borderRadius:"50%",
+        background:active?"var(--sage)":"var(--border)",
+        animation:active?"pulse 1.4s infinite":"none",
+        boxShadow:active?"0 0 0 3px rgba(61,122,95,0.2)":"none",
+      }}/>
       {active ? "LIVE" : "IDLE"}
     </span>
   );
 }
 
+function ResultBadge({ label }) {
+  const cfg = {
+    "Highly Engaged":     {bg:"rgba(61,122,95,0.1)",  color:"var(--sage)"},
+    "Moderately Engaged": {bg:"rgba(201,150,58,0.1)", color:"var(--gold)"},
+    "Disengaged":         {bg:"rgba(192,57,43,0.08)", color:"var(--danger)"},
+  }[label] || {bg:"rgba(148,163,184,0.1)",color:"var(--text-muted)"};
+  return (
+    <span style={{
+      display:"inline-block",background:cfg.bg,color:cfg.color,
+      padding:"3px 10px",borderRadius:20,fontSize:"0.75rem",fontWeight:700,
+    }}>
+      {label}
+    </span>
+  );
+}
+
+// Build recharts data: [{cycle:"C1", "Alice":82, "Bob":65}, ...]
+function buildChartData(summary) {
+  if (!summary?.length) return {data:[],students:[]};
+  const maxCycles = Math.max(...summary.map(s => s.timeline?.length || 0));
+  const data = Array.from({length:maxCycles}, (_,i) => {
+    const point = {cycle:`C${i+1}`};
+    summary.forEach(s => {
+      if (s.timeline?.[i]) point[s.student_name] = s.timeline[i].score;
+    });
+    return point;
+  });
+  return {data, students:summary.map(s => s.student_name)};
+}
+
+// ── Component ──────────────────────────────────────────────────────
 export default function TeacherDashboard() {
   const user = getUser();
 
-  const [classes,          setClasses]          = useState([]);
-  const [selectedClass,    setSelectedClass]     = useState(null);
-  const [newClassName,     setNewClassName]      = useState("");
-  const [creating,         setCreating]          = useState(false);
-  const [showCreate,       setShowCreate]        = useState(false);
-  const [sessionActive,    setSessionActive]     = useState(false);
-  const [intervalMinutes,  setIntervalMinutes]   = useState(5);
-  const [sessionStarting,  setSessionStarting]   = useState(false);
-  const [sessionError,     setSessionError]      = useState("");
-  const [sessionInfo,      setSessionInfo]       = useState(null);
+  const [classes,         setClasses]        = useState([]);
+  const [selectedClass,   setSelectedClass]  = useState(null);
+  const [newClassName,    setNewClassName]    = useState("");
+  const [creating,        setCreating]        = useState(false);
+  const [showCreate,      setShowCreate]      = useState(false);
+  const [sessionActive,   setSessionActive]   = useState(false);
+  const [intervalMinutes, setIntervalMinutes] = useState(5);
+  const [sessionStarting, setSessionStarting] = useState(false);
+  const [sessionError,    setSessionError]    = useState("");
+  const [sessionInfo,     setSessionInfo]     = useState(null);
+  const [engagement,      setEngagement]      = useState(null);
 
-  // All refs at top level
-  const pollRef           = useRef(null);
-  const selectedClassRef  = useRef(null);
+  const sessionPollRef  = useRef(null);
+  const engagePollRef   = useRef(null);
+  const selectedClsRef  = useRef(null);
+  const sessionInfoRef  = useRef(null);
 
-  // Keep ref in sync
-  useEffect(() => { selectedClassRef.current = selectedClass; }, [selectedClass]);
+  useEffect(() => { selectedClsRef.current = selectedClass; }, [selectedClass]);
+  useEffect(() => { sessionInfoRef.current = sessionInfo;   }, [sessionInfo]);
 
+  // ── Load teacher's classes ────────────────────────────────────────
   const loadClasses = useCallback(async () => {
     try {
       const data = await getMyClasses();
       setClasses(data.classes || []);
-      if (data.classes?.length && !selectedClassRef.current) {
+      if (data.classes?.length && !selectedClsRef.current)
         setSelectedClass(data.classes[0]);
-      }
-    } catch (e) {
-      console.error("Could not load classes:", e.message);
-    }
+    } catch (e) { console.error(e.message); }
   }, []);
 
   useEffect(() => { loadClasses(); }, [loadClasses]);
 
-  // Poll session status for selected class
+  // ── Poll session status ───────────────────────────────────────────
   useEffect(() => {
-    clearInterval(pollRef.current);
+    clearInterval(sessionPollRef.current);
+    clearInterval(engagePollRef.current);
     if (!selectedClass) return;
 
-    async function poll() {
+    async function pollSession() {
       try {
         const data = await getClassSessionStatus(selectedClass.class_id);
         setSessionActive(data.active);
@@ -74,132 +121,148 @@ export default function TeacherDashboard() {
       } catch {}
     }
 
-    poll();
-    pollRef.current = setInterval(poll, 3000);
-    return () => clearInterval(pollRef.current);
+    async function pollEngagement() {
+      try {
+        const sid = sessionInfoRef.current?.session_id;
+        const data = await getClassEngagement(selectedClass.class_id, sid);
+        setEngagement(data);
+      } catch {}
+    }
+
+    pollSession();
+    pollEngagement();
+    sessionPollRef.current = setInterval(pollSession,    3000);
+    engagePollRef.current  = setInterval(pollEngagement, 5000);
+
+    return () => {
+      clearInterval(sessionPollRef.current);
+      clearInterval(engagePollRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClass]);
 
+  // Re-fetch engagement immediately when session goes active/inactive
+  useEffect(() => {
+    if (!selectedClass) return;
+    getClassEngagement(selectedClass.class_id, sessionInfo?.session_id)
+      .then(setEngagement).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionActive]);
+
+  // ── Handlers ──────────────────────────────────────────────────────
   async function handleCreateClass(e) {
     e.preventDefault();
     if (!newClassName.trim()) return;
     setCreating(true);
     try {
       const data = await createClass(newClassName);
-      setNewClassName("");
-      setShowCreate(false);
+      setNewClassName(""); setShowCreate(false);
       await loadClasses();
-      setSelectedClass({ class_id: data.class_id, class_name: data.class_name });
-    } catch (err) {
-      setSessionError(err.message);
-    } finally {
-      setCreating(false);
-    }
+      setSelectedClass({class_id:data.class_id, class_name:data.class_name});
+    } catch (err) { setSessionError(err.message); }
+    finally       { setCreating(false); }
   }
 
   async function handleStartSession() {
     if (!selectedClass) return;
-    setSessionStarting(true);
-    setSessionError("");
+    setSessionStarting(true); setSessionError(""); setEngagement(null);
     try {
       await startClassSession(selectedClass.class_id, intervalMinutes);
       setSessionActive(true);
-    } catch (err) {
-      setSessionError(err.message);
-    } finally {
-      setSessionStarting(false);
-    }
+    } catch (err) { setSessionError(err.message); }
+    finally       { setSessionStarting(false); }
   }
 
   async function handleStopSession() {
     if (!selectedClass) return;
     try {
       await stopClassSession(selectedClass.class_id);
-      setSessionActive(false);
-      setSessionInfo(null);
-    } catch (err) {
-      setSessionError(err.message);
-    }
+      setSessionActive(false); setSessionInfo(null);
+    } catch (err) { setSessionError(err.message); }
   }
 
+  // ── Derived display data ──────────────────────────────────────────
+  const summary   = engagement?.summary || [];
+  const {data:chartData, students} = buildChartData(summary);
+  const avgScore  = summary.length
+    ? (summary.reduce((s,x) => s + x.avg_score, 0) / summary.length).toFixed(1) : "—";
+  const engagedN  = summary.filter(s => s.avg_score >= 70).length;
+
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="main-content">
-      <Navbar />
+      <Navbar/>
       <div className="page-body">
 
-        {/* Header */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: 28 }}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:28}}>
           <div>
             <h1 className="page-title">Teacher Dashboard</h1>
-            <p className="page-desc">Manage your classes and monitor student attention</p>
+            <p className="page-desc">Manage classes and view real-time student engagement</p>
           </div>
           <span className="badge badge-primary">👨‍🏫 {user?.name}</span>
         </div>
 
         {sessionError && (
           <div style={{
-            background:"rgba(192,57,43,0.07)", border:"1px solid rgba(192,57,43,0.2)",
-            borderRadius:"var(--radius-sm)", padding:"11px 15px",
-            color:"var(--danger)", fontSize:"0.85rem", marginBottom: 20,
-            display:"flex", alignItems:"center", gap: 8,
+            background:"rgba(192,57,43,0.07)",border:"1px solid rgba(192,57,43,0.2)",
+            borderRadius:"var(--radius-sm)",padding:"11px 15px",
+            color:"var(--danger)",fontSize:"0.85rem",marginBottom:20,
+            display:"flex",alignItems:"center",gap:8,
           }}>
             <AlertCircle size={15}/> {sessionError}
           </div>
         )}
 
-        <div style={{ display:"grid", gridTemplateColumns:"300px 1fr", gap: 20, alignItems:"start" }}>
+        <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:20,alignItems:"start"}}>
 
-          {/* Left: class list */}
+          {/* ── Class list ── */}
           <div className="card fade-up">
-            <div className="card-header" style={{ marginBottom: 14 }}>
-              <div className="card-title" style={{ display:"flex", alignItems:"center", gap: 8 }}>
-                <BookOpen size={16} style={{ color:"var(--sage)" }} /> My Classes
+            <div className="card-header" style={{marginBottom:14}}>
+              <div className="card-title" style={{display:"flex",alignItems:"center",gap:8}}>
+                <BookOpen size={16} style={{color:"var(--sage)"}}/> My Classes
               </div>
               <button className="btn btn-ghost btn-sm"
-                onClick={() => setShowCreate(v => !v)}
-                style={{ padding:"4px 8px" }}>
-                <Plus size={14} />
+                onClick={() => setShowCreate(v=>!v)} style={{padding:"4px 8px"}}>
+                <Plus size={14}/>
               </button>
             </div>
 
             {showCreate && (
-              <form onSubmit={handleCreateClass} style={{ marginBottom: 14 }}>
-                <input className="form-input"
-                  placeholder="e.g. Software Engineering 2B"
-                  value={newClassName}
-                  onChange={e => setNewClassName(e.target.value)}
-                  style={{ marginBottom: 8 }} autoFocus />
+              <form onSubmit={handleCreateClass} style={{marginBottom:14}}>
+                <input className="form-input" placeholder="Class name"
+                  value={newClassName} onChange={e=>setNewClassName(e.target.value)}
+                  style={{marginBottom:8}} autoFocus/>
                 <button type="submit" className="btn btn-primary btn-full"
-                  disabled={creating || !newClassName.trim()}
-                  style={{ fontSize:"0.84rem" }}>
-                  {creating ? "Creating..." : "Create Class"}
+                  disabled={creating||!newClassName.trim()} style={{fontSize:"0.84rem"}}>
+                  {creating?"Creating...":"Create Class"}
                 </button>
               </form>
             )}
 
             {classes.length === 0 ? (
-              <div style={{ textAlign:"center", padding:"28px 12px", color:"var(--text-muted)", fontSize:"0.85rem" }}>
-                <BookOpen size={28} style={{ margin:"0 auto 10px", opacity: 0.2 }} />
-                No classes yet.<br />Click + to create one.
+              <div style={{textAlign:"center",padding:"28px 12px",color:"var(--text-muted)",fontSize:"0.85rem"}}>
+                <BookOpen size={28} style={{margin:"0 auto 10px",opacity:0.2}}/>
+                No classes yet.<br/>Click + to create one.
               </div>
             ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap: 6 }}>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {classes.map(cls => (
                   <button key={cls.class_id}
                     onClick={() => { setSelectedClass(cls); setSessionError(""); }}
                     style={{
-                      display:"flex", alignItems:"center", justifyContent:"space-between",
-                      padding:"11px 14px", borderRadius:"var(--radius-sm)",
-                      border:`1.5px solid ${selectedClass?.class_id === cls.class_id ? "var(--navy)" : "var(--border-light)"}`,
-                      background: selectedClass?.class_id === cls.class_id ? "rgba(15,31,61,0.04)" : "transparent",
-                      cursor:"pointer", textAlign:"left", width:"100%", transition:"all 0.15s",
+                      display:"flex",alignItems:"center",justifyContent:"space-between",
+                      padding:"11px 14px",borderRadius:"var(--radius-sm)",
+                      border:`1.5px solid ${selectedClass?.class_id===cls.class_id?"var(--navy)":"var(--border-light)"}`,
+                      background:selectedClass?.class_id===cls.class_id?"rgba(15,31,61,0.04)":"transparent",
+                      cursor:"pointer",textAlign:"left",width:"100%",transition:"all 0.15s",
                     }}>
                     <span style={{
-                      fontSize:"0.88rem", fontWeight: 600,
-                      color: selectedClass?.class_id === cls.class_id ? "var(--navy)" : "var(--text-secondary)",
+                      fontSize:"0.88rem",fontWeight:600,
+                      color:selectedClass?.class_id===cls.class_id?"var(--navy)":"var(--text-secondary)",
                     }}>
                       {cls.class_name}
                     </span>
-                    <span style={{ fontSize:"0.72rem", color:"var(--text-muted)", fontFamily:"var(--font-mono)" }}>
+                    <span style={{fontSize:"0.72rem",color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>
                       #{cls.class_id}
                     </span>
                   </button>
@@ -208,115 +271,232 @@ export default function TeacherDashboard() {
             )}
           </div>
 
-          {/* Right: session control */}
-          <div>
+          {/* ── Right panel ── */}
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
             {!selectedClass ? (
               <div className="card fade-up" style={{
-                textAlign:"center", padding:"64px 24px",
-                background:"linear-gradient(160deg, #F8FAFF, #EEF2FF)",
+                textAlign:"center",padding:"64px 24px",
+                background:"linear-gradient(160deg,#F8FAFF,#EEF2FF)",
               }}>
-                <BookOpen size={36} style={{ margin:"0 auto 16px", opacity: 0.2 }} />
-                <div style={{ fontFamily:"var(--font-display)", fontSize:"1.1rem", fontWeight: 600, marginBottom: 8 }}>
+                <BookOpen size={36} style={{margin:"0 auto 16px",opacity:0.2}}/>
+                <div style={{fontFamily:"var(--font-display)",fontSize:"1.1rem",fontWeight:600,marginBottom:8}}>
                   Select or create a class
                 </div>
-                <div style={{ fontSize:"0.88rem", color:"var(--text-muted)" }}>
-                  Choose a class from the left to start monitoring
+                <div style={{fontSize:"0.88rem",color:"var(--text-muted)"}}>
+                  Choose a class from the left to begin
                 </div>
               </div>
             ) : (
               <>
-                <div className="card fade-up" style={{ marginBottom: 16 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: 24 }}>
+                {/* Session control */}
+                <div className="card fade-up">
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
                     <div>
-                      <div style={{
-                        fontFamily:"var(--font-display)", fontWeight: 700,
-                        fontSize:"1.3rem", color:"var(--navy)", marginBottom: 4,
-                      }}>
+                      <div style={{fontFamily:"var(--font-display)",fontWeight:700,fontSize:"1.2rem",color:"var(--navy)",marginBottom:3}}>
                         {selectedClass.class_name}
                       </div>
-                      <div style={{ fontSize:"0.8rem", color:"var(--text-muted)" }}>
-                        Class ID: <span style={{ fontFamily:"var(--font-mono)" }}>#{selectedClass.class_id}</span>
+                      <div style={{fontSize:"0.78rem",color:"var(--text-muted)"}}>
+                        ID: <span style={{fontFamily:"var(--font-mono)"}}>#{selectedClass.class_id}</span>
+                        {sessionInfo && <> · Session <span style={{fontFamily:"var(--font-mono)"}}>#{sessionInfo.session_id}</span></>}
                       </div>
                     </div>
-                    <StatusPill active={sessionActive} />
+                    <StatusPill active={sessionActive}/>
                   </div>
 
                   {sessionActive && sessionInfo && (
                     <div style={{
-                      background:"rgba(61,122,95,0.06)", border:"1px solid rgba(61,122,95,0.15)",
-                      borderRadius:"var(--radius-sm)", padding:"14px 16px", marginBottom: 20,
-                      display:"flex", alignItems:"center", gap: 12,
+                      background:"rgba(61,122,95,0.06)",border:"1px solid rgba(61,122,95,0.15)",
+                      borderRadius:"var(--radius-sm)",padding:"12px 16px",marginBottom:18,
+                      display:"flex",alignItems:"center",gap:12,
                     }}>
-                      <Activity size={16} style={{ color:"var(--sage)", flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontSize:"0.84rem", fontWeight: 600, color:"var(--sage)" }}>
-                          Session is live — students are being monitored
-                        </div>
-                        <div style={{ fontSize:"0.78rem", color:"var(--text-muted)", marginTop: 2 }}>
-                          Interval: {sessionInfo.interval_minutes} min ·
-                          Started: {new Date(sessionInfo.start_time).toLocaleTimeString()}
-                        </div>
+                      <Activity size={15} style={{color:"var(--sage)",flexShrink:0}}/>
+                      <div style={{fontSize:"0.84rem",fontWeight:600,color:"var(--sage)"}}>
+                        Session live · started {new Date(sessionInfo.start_time).toLocaleTimeString()}
+                        · {sessionInfo.interval_minutes} min interval
                       </div>
                     </div>
                   )}
 
-                  <div style={{ display:"flex", alignItems:"center", gap: 14, flexWrap:"wrap" }}>
+                  <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                     <div style={{
-                      display:"flex", alignItems:"center", gap: 10,
-                      background:"var(--bg)", borderRadius:"var(--radius-sm)",
-                      padding:"10px 16px", opacity: sessionActive ? 0.5 : 1,
+                      display:"flex",alignItems:"center",gap:10,
+                      background:"var(--bg)",borderRadius:"var(--radius-sm)",
+                      padding:"9px 14px",opacity:sessionActive?0.5:1,
                     }}>
-                      <Timer size={14} style={{ color:"var(--text-muted)" }} />
-                      <span style={{ fontSize:"0.84rem", color:"var(--text-secondary)", fontWeight: 500 }}>
-                        Interval:
-                      </span>
+                      <Timer size={14} style={{color:"var(--text-muted)"}}/>
+                      <span style={{fontSize:"0.84rem",color:"var(--text-secondary)",fontWeight:500}}>Interval:</span>
                       <input type="number" min={1} max={60}
                         value={intervalMinutes}
-                        onChange={e => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                        onChange={e=>setIntervalMinutes(Math.max(1,parseInt(e.target.value)||1))}
                         disabled={sessionActive}
                         style={{
-                          width: 50, padding:"6px 8px",
-                          border:"1.5px solid var(--border)", borderRadius:"var(--radius-sm)",
-                          fontFamily:"var(--font-display)", fontWeight: 700,
-                          fontSize:"0.95rem", color:"var(--navy)",
-                          textAlign:"center", outline:"none",
-                          background: sessionActive ? "var(--bg)" : "white",
-                        }} />
-                      <span style={{ fontSize:"0.84rem", color:"var(--text-muted)" }}>min</span>
+                          width:50,padding:"5px 8px",
+                          border:"1.5px solid var(--border)",borderRadius:"var(--radius-sm)",
+                          fontFamily:"var(--font-display)",fontWeight:700,fontSize:"0.95rem",
+                          color:"var(--navy)",textAlign:"center",outline:"none",
+                          background:sessionActive?"var(--bg)":"white",
+                        }}/>
+                      <span style={{fontSize:"0.84rem",color:"var(--text-muted)"}}>min</span>
                     </div>
-
                     <button className="btn btn-sage" onClick={handleStartSession}
-                      disabled={sessionActive || sessionStarting} style={{ minWidth: 150 }}>
-                      {sessionStarting ? "Starting..." : <><Play size={14}/> Start Session</>}
+                      disabled={sessionActive||sessionStarting} style={{minWidth:144}}>
+                      {sessionStarting?"Starting...":<><Play size={14}/> Start Session</>}
                     </button>
-
-                    <button className="btn btn-danger" onClick={handleStopSession}
-                      disabled={!sessionActive}>
+                    <button className="btn btn-danger" onClick={handleStopSession} disabled={!sessionActive}>
                       <Square size={14}/> Stop Session
                     </button>
                   </div>
                 </div>
 
-                <div className="card fade-up-2" style={{ background:"linear-gradient(160deg, #F8FAFF, #EEF2FF)" }}>
-                  <div className="card-title" style={{ marginBottom: 14 }}>How it works</div>
-                  {[
-                    { icon:<Play size={14}/>,     text:"Click Start Session — students are notified automatically" },
-                    { icon:<Activity size={14}/>, text:"Students' browsers begin monitoring via CV and keyboard/mouse signals" },
-                    { icon:<Timer size={14}/>,    text:`Every ${intervalMinutes} minutes, a new 20-second measurement cycle runs` },
-                    { icon:<Square size={14}/>,   text:"Click Stop Session to end monitoring for all students" },
-                  ].map((item, i) => (
-                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap: 12, marginBottom: i < 3 ? 12 : 0 }}>
-                      <span style={{
-                        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                        background:"rgba(15,31,61,0.07)",
-                        display:"flex", alignItems:"center", justifyContent:"center", color:"var(--navy)",
-                      }}>{item.icon}</span>
-                      <span style={{ fontSize:"0.85rem", color:"var(--text-secondary)", lineHeight: 1.6 }}>
-                        {item.text}
-                      </span>
+                {/* Summary stat cards */}
+                {summary.length > 0 && (
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+                    {[
+                      {label:"Students Monitored", value:summary.length,                icon:<Users size={15}/>,    color:"var(--navy)"},
+                      {label:"Class Avg Score",    value:`${avgScore}%`,                icon:<TrendingUp size={15}/>,color:scoreColor(parseFloat(avgScore)||0)},
+                      {label:"Engaged Students",   value:`${engagedN}/${summary.length}`,icon:<Award size={15}/>,   color:"var(--sage)"},
+                    ].map((s,i) => (
+                      <div key={i} className="card" style={{borderTop:`3px solid ${s.color}`,padding:"14px 16px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                          <span style={{color:s.color}}>{s.icon}</span>
+                          <span style={{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"var(--text-muted)"}}>
+                            {s.label}
+                          </span>
+                        </div>
+                        <div style={{fontFamily:"var(--font-display)",fontWeight:800,fontSize:"1.5rem",color:s.color}}>
+                          {s.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Timeline chart */}
+                {chartData.length > 1 && students.length > 0 && (
+                  <div className="card fade-up-2">
+                    <div className="card-header" style={{marginBottom:16}}>
+                      <div>
+                        <div className="card-title">Engagement Timeline</div>
+                        <div className="card-subtitle">Per-student scores across cycles</div>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={chartData} margin={{top:5,right:20,left:-20,bottom:0}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)"/>
+                        <XAxis dataKey="cycle" tick={{fontSize:11,fill:"var(--text-muted)"}} axisLine={false} tickLine={false}/>
+                        <YAxis domain={[0,100]} tick={{fontSize:11,fill:"var(--text-muted)"}} axisLine={false} tickLine={false}/>
+                        <Tooltip
+                          contentStyle={{background:"white",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}
+                          formatter={(v,n) => [`${v?.toFixed(1)}%`, n]}
+                        />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{fontSize:"0.82rem"}}/>
+                        {students.map((name,i) => (
+                          <Line key={name} type="monotone" dataKey={name}
+                            stroke={LINE_COLORS[i%LINE_COLORS.length]}
+                            strokeWidth={2} dot={{r:3}} activeDot={{r:5}} connectNulls/>
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Student table */}
+                {summary.length > 0 ? (
+                  <div className="card fade-up-3">
+                    <div className="card-header" style={{marginBottom:16}}>
+                      <div>
+                        <div className="card-title">
+                          <Users size={14} style={{display:"inline",marginRight:7,color:"var(--sage)"}}/>
+                          Student Engagement
+                        </div>
+                        <div className="card-subtitle">
+                          {engagement?.total_records||0} records total · refreshes every 5s
+                        </div>
+                      </div>
+                    </div>
+                    <div className="table-wrapper">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Student</th>
+                            <th>Avg Score</th>
+                            <th>Cycles</th>
+                            <th>Engaged</th>
+                            <th>Result</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.map((s,i) => {
+                            const col = scoreColor(s.avg_score);
+                            return (
+                              <tr key={s.student_id}>
+                                <td>
+                                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                                    <div style={{
+                                      width:32,height:32,borderRadius:"50%",flexShrink:0,
+                                      background:`${LINE_COLORS[i%LINE_COLORS.length]}22`,
+                                      border:`2px solid ${LINE_COLORS[i%LINE_COLORS.length]}55`,
+                                      display:"flex",alignItems:"center",justifyContent:"center",
+                                      fontFamily:"var(--font-display)",fontWeight:700,fontSize:"0.78rem",
+                                      color:LINE_COLORS[i%LINE_COLORS.length],
+                                    }}>
+                                      {s.student_name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+                                    </div>
+                                    <span style={{fontWeight:600,fontSize:"0.88rem"}}>{s.student_name}</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                                    <div style={{
+                                      width:56,height:6,borderRadius:3,
+                                      background:"var(--border)",flexShrink:0,overflow:"hidden",
+                                    }}>
+                                      <div style={{
+                                        width:`${Math.min(s.avg_score,100)}%`,height:"100%",
+                                        background:col,borderRadius:3,
+                                        transition:"width 0.4s ease",
+                                      }}/>
+                                    </div>
+                                    <strong style={{color:col,fontFamily:"var(--font-display)",fontSize:"0.92rem"}}>
+                                      {s.avg_score}%
+                                    </strong>
+                                  </div>
+                                </td>
+                                <td style={{textAlign:"center",fontFamily:"var(--font-display)",fontWeight:700}}>
+                                  {s.total_cycles}
+                                </td>
+                                <td style={{textAlign:"center"}}>
+                                  <span style={{
+                                    background:"rgba(61,122,95,0.1)",color:"var(--sage)",
+                                    padding:"3px 10px",borderRadius:20,fontWeight:700,fontSize:"0.78rem",
+                                  }}>
+                                    {s.engaged_cycles}/{s.total_cycles}
+                                  </span>
+                                </td>
+                                <td><ResultBadge label={s.overall_label}/></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card fade-up-2" style={{
+                    textAlign:"center",padding:"40px 24px",
+                    background:"linear-gradient(160deg,#F8FAFF,#EEF2FF)",
+                  }}>
+                    <Users size={32} style={{margin:"0 auto 14px",opacity:0.18}}/>
+                    <div style={{fontFamily:"var(--font-display)",fontWeight:600,fontSize:"1rem",marginBottom:8}}>
+                      {sessionActive?"Waiting for students...":"No data yet"}
+                    </div>
+                    <div style={{fontSize:"0.85rem",color:"var(--text-muted)"}}>
+                      {sessionActive
+                        ?"Student scores will appear here as monitoring cycles complete"
+                        :"Start a session to begin collecting engagement data"}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
