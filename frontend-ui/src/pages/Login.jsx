@@ -1,30 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, ArrowRight } from "lucide-react";
-import { loginWithCredentials } from "../services/auth";
+import { login } from "../services/auth";
+import { Eye, EyeOff, BookOpen, BarChart2, ShieldCheck } from "lucide-react";
 
 export default function Login() {
-  const navigate  = useNavigate();
-  const [email, setEmail]       = useState("");
+  const navigate = useNavigate();
+  const [role,     setRole]     = useState("teacher");
+  const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [showPw,   setShowPw]   = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setLoading(true);
+  // Auto-fill credentials on role select
+  function handleRoleSelect(r) {
+    setRole(r);
     setError("");
-    const result = await loginWithCredentials(email, password);
-    if (result.success) {
-      navigate("/dashboard");
-    } else {
-      setError(result.error);
-    }
-    setLoading(false);
-  }
-
-  function fillDemo(role) {
-    if (role === "teacher") {
+    if (r === "teacher") {
       setEmail("teacher@eengage.com");
       setPassword("password123");
     } else {
@@ -33,84 +25,183 @@ export default function Login() {
     }
   }
 
-  return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center",
-      justifyContent: "center", padding: 24,
-      background: "linear-gradient(135deg, #0F1F5C 0%, #1E3A8A 50%, #312E81 100%)",
-      position: "relative", overflow: "hidden",
-    }}>
-      <div style={{ position:"absolute", top:"10%", left:"15%", width:300, height:300, borderRadius:"50%", background:"rgba(6,182,212,0.12)", filter:"blur(80px)" }} />
-      <div style={{ position:"absolute", bottom:"15%", right:"10%", width:250, height:250, borderRadius:"50%", background:"rgba(99,102,241,0.15)", filter:"blur(70px)" }} />
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!email || !password) { setError("Please enter your credentials."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      await login(email, password);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message || "Invalid credentials. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      <div className="fade-up" style={{
-        background: "rgba(255,255,255,0.97)", borderRadius: "var(--radius)",
-        padding: "44px 40px", width: "100%", maxWidth: 420,
-        boxShadow: "var(--shadow-lg)", position: "relative", zIndex: 1,
-      }}>
-        <div style={{ textAlign:"center", marginBottom:28 }}>
-          <div className="navbar-logo" style={{ fontSize:"1.8rem", display:"block", marginBottom:8 }}>
-            E‑ENGAGE<span>.</span>
+  const features = [
+    {
+      icon: <BarChart2 size={16} />,
+      label: "Real-time Monitoring",
+      desc:  "20-second attention cycles with live feedback",
+    },
+    {
+      icon: <BookOpen size={16} />,
+      label: "Multimodal Detection",
+      desc:  "Computer vision + keyboard & mouse signals",
+    },
+    {
+      icon: <ShieldCheck size={16} />,
+      label: "Private & Secure",
+      desc:  "Data stays on your institution's servers",
+    },
+  ];
+
+  return (
+    <div className="login-page">
+
+      {/* ── Left brand panel ── */}
+      <div className="login-brand-panel">
+        <div className="login-brand-content">
+          <div className="login-wordmark">
+            E<span>-</span>ENGAGE<span style={{ color: "rgba(250,248,244,0.3)" }}>.</span>
           </div>
-          <p style={{ color:"var(--text-muted)", fontSize:"0.88rem" }}>
-            Sign in to your account
-          </p>
+          <div className="login-brand-tagline">
+            AI Driven Student Attention Detection
+          </div>
+          <div className="login-brand-headline">
+            Understand how your students engage — in real time.
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email Address</label>
-            <div className="input-wrapper">
-              <Mail className="input-icon" size={16} />
-              <input type="email" className="form-input input-with-icon"
-                placeholder="your@email.com" value={email}
-                onChange={e => setEmail(e.target.value)} required style={{ width:"100%" }} />
+        <div className="login-features">
+          {features.map((f, i) => (
+            <div key={i} className="login-feature-item">
+              <div className="login-feature-icon">{f.icon}</div>
+              <div className="login-feature-text">
+                <strong>{f.label}</strong>
+                <span>{f.desc}</span>
+              </div>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Right form panel ── */}
+      <div className="login-form-panel">
+        <div className="login-form-box fade-up">
+
+          <div className="login-form-title">Welcome back</div>
+          <div className="login-form-sub">Sign in to your E-ENGAGE account</div>
+
+          {/* Role selector */}
+          <div className="role-selector">
+            {["teacher", "student"].map(r => (
+              <div
+                key={r}
+                className={`role-option${role === r ? " active" : ""}`}
+                onClick={() => handleRoleSelect(r)}
+              >
+                <span className="role-option-icon">
+                  {r === "teacher" ? "👨‍🏫" : "👨‍🎓"}
+                </span>
+                <span className="role-option-label">
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </span>
+              </div>
+            ))}
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <div className="input-wrapper">
-              <Lock className="input-icon" size={16} />
-              <input type="password" className="form-input input-with-icon"
-                placeholder="••••••••" value={password}
-                onChange={e => setPassword(e.target.value)} required style={{ width:"100%" }} />
-            </div>
+          {/* Auto-fill hint */}
+          <div className="login-hint">
+            Demo credentials auto-filled — just click Sign In.
           </div>
 
+          {/* Error */}
           {error && (
-            <div style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.2)",
-              borderRadius:"var(--radius-sm)", padding:"10px 14px", color:"var(--danger)",
-              fontSize:"0.85rem", marginBottom:16 }}>
+            <div style={{
+              background: "rgba(192,57,43,0.07)",
+              border: "1px solid rgba(192,57,43,0.2)",
+              borderRadius: "var(--radius-sm)",
+              padding: "10px 14px",
+              color: "var(--danger)",
+              fontSize: "0.84rem",
+              marginBottom: 20,
+            }}>
               {error}
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary" disabled={loading}
-            style={{ width:"100%", padding:"13px", fontSize:"0.95rem" }}>
-            {loading ? <span className="loader" /> : <>Sign In <ArrowRight size={16} /></>}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <input
+                className="form-input"
+                type="email"
+                placeholder="you@institution.edu"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
 
-        {/* Demo credentials */}
-        <div style={{ marginTop:20 }}>
-          <div style={{ fontSize:"0.75rem", color:"var(--text-muted)", textAlign:"center", marginBottom:10, textTransform:"uppercase", letterSpacing:"0.06em" }}>
-            Demo Accounts
-          </div>
-          <div style={{ display:"flex", gap:8 }}>
-            <button onClick={() => fillDemo("teacher")} type="button"
-              className="btn btn-outline btn-sm" style={{ flex:1, fontSize:"0.78rem" }}>
-              👨‍🏫 Teacher Demo
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <div style={{ position: "relative" }}>
+                <input
+                  className="form-input"
+                  type={showPw ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  style={{ paddingRight: 44 }}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(p => !p)}
+                  style={{
+                    position: "absolute", right: 12, top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none", border: "none",
+                    cursor: "pointer", color: "var(--text-muted)",
+                    display: "flex", alignItems: "center",
+                    padding: 4,
+                  }}
+                >
+                  {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-full btn-lg"
+              disabled={loading}
+              style={{ marginTop: 8 }}
+            >
+              {loading ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 16 16" style={{ animation: "spin 0.8s linear infinite" }}>
+                    <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="20" strokeDashoffset="10" />
+                  </svg>
+                  Signing in...
+                </>
+              ) : "Sign In"}
             </button>
-            <button onClick={() => fillDemo("student")} type="button"
-              className="btn btn-outline btn-sm" style={{ flex:1, fontSize:"0.78rem" }}>
-              👨‍🎓 Student Demo
-            </button>
+          </form>
+
+          <div style={{
+            marginTop: 28, paddingTop: 20,
+            borderTop: "1px solid var(--border-light)",
+            textAlign: "center",
+            fontSize: "0.78rem",
+            color: "var(--text-muted)",
+          }}>
+            E-ENGAGE · Academic Edition
           </div>
-          <div style={{ marginTop:10, fontSize:"0.75rem", color:"var(--text-muted)", textAlign:"center", lineHeight:1.8 }}>
-            Teacher: teacher@eengage.com / password123<br />
-            Student: student@eengage.com / student123
-          </div>
+
         </div>
       </div>
     </div>

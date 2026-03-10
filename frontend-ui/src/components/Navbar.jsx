@@ -1,60 +1,60 @@
-import { useNavigate, NavLink } from "react-router-dom";
-import { logout, getUser } from "../services/auth";
+import { useLocation, useNavigate, Link } from "react-router-dom";
+import { logout, getUser, isTeacher } from "../services/auth";
 import { LayoutDashboard, History, Settings, LogOut } from "lucide-react";
 
 export default function Navbar() {
+  const location = useLocation();
   const navigate = useNavigate();
-  const user = getUser();
+  const user     = getUser();
+  
+
+  const initials = user?.name
+    ? user.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+    : "??";
 
   function handleLogout() {
     logout();
     navigate("/login");
   }
 
-  const initials = user?.name
-    ? user.name.split(" ").map(w => w[0]).join("").toUpperCase()
-    : "U";
+  const links = [
+    { path: "/dashboard", icon: <LayoutDashboard size={15}/>, label: "Dashboard" },
+    { path: "/history",   icon: <History size={15}/>,         label: "History"   },
+    { path: "/settings",  icon: <Settings size={15}/>,        label: "Settings"  },
+  ];
 
   return (
     <nav className="navbar">
-      <div className="navbar-logo">
-        E‑ENGAGE<span>.</span>
-      </div>
+      {/* Brand */}
+      <Link to="/dashboard" className="navbar-brand">
+        E<span>-</span>ENGAGE<span style={{ color: "rgba(250,248,244,0.25)", marginLeft: 1 }}>.</span>
+      </Link>
 
-      <div className="navbar-nav">
-        <NavLink
-          to="/dashboard"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <span style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <LayoutDashboard size={15} /> Dashboard
-          </span>
-        </NavLink>
-        <NavLink
-          to="/history"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <span style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <History size={15} /> History
-          </span>
-        </NavLink>
-        <NavLink
-          to="/settings"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <span style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <Settings size={15} /> Settings
-          </span>
-        </NavLink>
-      </div>
+      {/* Nav links */}
+      <ul className="navbar-nav">
+        {links.map(l => (
+          <li key={l.path}>
+            <Link
+              to={l.path}
+              className={`nav-link${location.pathname === l.path ? " active" : ""}`}
+            >
+              {l.icon} {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
 
-      <div className="navbar-right">
-        <div className="navbar-user">
-          <div className="user-avatar">{initials}</div>
-          <span>{user?.name || "Teacher"}</span>
+      {/* User */}
+      <div className="navbar-user">
+        <div className="user-avatar">{initials}</div>
+        <div>
+          <div className="user-name">{user?.name || "User"}</div>
+          <div style={{ fontSize: "0.72rem", color: "rgba(250,248,244,0.38)", textTransform: "capitalize" }}>
+            {user?.role || "—"}
+          </div>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
-          <LogOut size={15} /> Logout
+        <button className="btn-logout" onClick={handleLogout}>
+          <LogOut size={13}/> Logout
         </button>
       </div>
     </nav>
