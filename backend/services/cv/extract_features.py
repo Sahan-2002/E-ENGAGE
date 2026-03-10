@@ -68,7 +68,7 @@ def get_cv_features():
     cap = cv2.VideoCapture(0)
 
     if not cap.isOpened():
-        print("❌ CV ERROR: Camera not opened")
+        print("CV ERROR: Camera not opened")
         return {
             "face_detected": 0,
             "eye_openness": 0.0,

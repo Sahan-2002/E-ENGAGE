@@ -1,4 +1,5 @@
-from .track_input import track_input
+# backend/services/hci/features.py
+from services.hci.track_input import track_input
 
 def get_hci_features():
     return track_input()

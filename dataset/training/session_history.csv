@@ -1,0 +1,4 @@
+session_id,user,role,date,time,duration_minutes,total_cycles,avg_score,engaged_count,disengaged_count,label_summary
+2E43BA27,teacher@eengage.com,teacher,2026-03-10,10:24,2,45.66,0,2,Disengaged
+4D838A68,teacher@eengage.com,teacher,2026-03-10,11:00,4,61.82,2,2,Moderately Engaged
+56FEE75E,teacher@eengage.com,teacher,2026-03-10,11:10,2.2,2,54.7,1,1,Moderately Engaged
