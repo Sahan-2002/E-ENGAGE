@@ -871,3 +871,206 @@ tbody tr:last-child td { border-bottom: none; }
 .text-danger   { color: var(--danger); }
 .font-display  { font-family: var(--font-display); }
 .font-mono     { font-family: var(--font-mono); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   E-ENGAGE — DARK MODE
+   Append this to the END of App.css (replace any previous dark-mode block)
+
+   KEY RULE: Every selector is scoped to [data-theme="dark"].
+   Nothing here affects light mode. No global * transitions.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── CSS variable overrides ─────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:            #0D1829;
+  --bg-card:       #111F35;
+  --border:        #1E3050;
+  --border-light:  #172840;
+  --text-primary:  #E8EDF5;
+  --text-secondary:#B8C4D8;
+  --text-muted:    #7A8FAA;
+  --text-inverse:  #0D1829;
+  --cream:         #E8EDF5;
+  --cream-dark:    #D0D8E8;
+  --parchment:     #C4CEDF;
+  --sage:          #5DB88A;
+  --sage-light:    #74CFA0;
+  --gold:          #D4A843;
+  --gold-light:    #EFC060;
+  --danger:        #E05A4A;
+  --shadow-card:   0 2px 12px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* ── Body ────────────────────────────────────────────────────────────── */
+[data-theme="dark"] body {
+  background-color: #0D1829;
+  color: #E8EDF5;
+}
+
+/* ── Smooth transitions — only once theme is initialized ─────────────── */
+/* Add class "theme-ready" to <html> after first mount to avoid flash    */
+html.theme-ready,
+html.theme-ready *,
+html.theme-ready *::before,
+html.theme-ready *::after {
+  transition:
+    background-color 0.22s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease !important;
+}
+html.theme-ready button,
+html.theme-ready a,
+html.theme-ready .btn {
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease !important;
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .main-content  { background-color: #0D1829; }
+[data-theme="dark"] .page-body     { background-color: #0D1829; }
+
+/* ── Navbar ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .navbar {
+  background: #060E1A;
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────── */
+[data-theme="dark"] .card {
+  background-color: #111F35;
+  border-color: #1E3050;
+}
+
+/* ── Titles ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .page-title    { color: #E8EDF5; }
+[data-theme="dark"] .page-desc     { color: #7A8FAA; }
+[data-theme="dark"] .card-title    { color: #E8EDF5; }
+[data-theme="dark"] .card-subtitle { color: #7A8FAA; }
+
+/* ── Form inputs ─────────────────────────────────────────────────────── */
+[data-theme="dark"] .form-input {
+  background-color: #0D1829;
+  border-color: #1E3050;
+  color: #E8EDF5;
+}
+[data-theme="dark"] .form-input:focus {
+  border-color: #5DB88A;
+  box-shadow: 0 0 0 3px rgba(93,184,138,0.12);
+}
+[data-theme="dark"] .form-input::placeholder {
+  color: #7A8FAA;
+}
+[data-theme="dark"] .form-label { color: #B8C4D8; }
+
+/* ── Number / select ─────────────────────────────────────────────────── */
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] select {
+  background-color: #111F35;
+  color: #E8EDF5;
+  border-color: #1E3050;
+}
+[data-theme="dark"] select option {
+  background-color: #111F35;
+  color: #E8EDF5;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] thead tr        { border-bottom-color: #1E3050; }
+[data-theme="dark"] td              { border-bottom-color: #172840; color: #E8EDF5; }
+[data-theme="dark"] tbody tr:hover  { background-color: rgba(255,255,255,0.03); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+[data-theme="dark"] .btn-primary {
+  background-color: #1E3A6E;
+  border-color: #2A4F8A;
+  color: #E8EDF5;
+}
+[data-theme="dark"] .btn-primary:hover:not(:disabled) {
+  background-color: #244480;
+}
+[data-theme="dark"] .btn-sage {
+  background-color: #3D7A5F;
+  border-color: #3D7A5F;
+  color: #fff;
+}
+[data-theme="dark"] .btn-sage:hover:not(:disabled) {
+  background-color: #5DB88A;
+}
+[data-theme="dark"] .btn-outline {
+  border-color: #1E3050;
+  color: #B8C4D8;
+  background-color: transparent;
+}
+[data-theme="dark"] .btn-outline:hover:not(:disabled) {
+  border-color: #5DB88A;
+  color: #74CFA0;
+  background-color: rgba(93,184,138,0.07);
+}
+[data-theme="dark"] .btn-ghost:hover:not(:disabled) {
+  background-color: rgba(255,255,255,0.06);
+  color: #E8EDF5;
+}
+[data-theme="dark"] .btn-danger {
+  background-color: rgba(224,90,74,0.1);
+  border-color: rgba(224,90,74,0.25);
+  color: #E05A4A;
+}
+[data-theme="dark"] .btn-danger:hover:not(:disabled) {
+  background-color: rgba(224,90,74,0.18);
+  border-color: rgba(224,90,74,0.45);
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .badge-primary { background-color: rgba(168,196,255,0.1);  color: #A8C4FF; }
+[data-theme="dark"] .badge-sage    { background-color: rgba(93,184,138,0.12);  color: #74CFA0; }
+[data-theme="dark"] .badge-gold    { background-color: rgba(212,168,67,0.12);  color: #EFC060; }
+[data-theme="dark"] .badge-danger  { background-color: rgba(224,90,74,0.12);   color: #E07A6E; }
+[data-theme="dark"] .badge-info    { background-color: rgba(90,138,232,0.12);  color: #5A8AE8; }
+
+/* ── Progress bar ────────────────────────────────────────────────────── */
+[data-theme="dark"] .progress-bar  { background-color: #1E3050; }
+[data-theme="dark"] .divider       { background-color: #172840; }
+
+/* ── Login / Register pages ──────────────────────────────────────────── */
+[data-theme="dark"] .login-page       { background-color: #0D1829; }
+[data-theme="dark"] .login-form-panel { background-color: #0A1422; }
+[data-theme="dark"] .login-form-title { color: #E8EDF5; }
+[data-theme="dark"] .login-form-sub   { color: #7A8FAA; }
+
+[data-theme="dark"] .role-option {
+  background-color: #111F35;
+  border-color: #1E3050;
+}
+[data-theme="dark"] .role-option:hover {
+  border-color: #5DB88A;
+  background-color: rgba(93,184,138,0.06);
+}
+[data-theme="dark"] .role-option.active {
+  border-color: #74CFA0;
+  background-color: rgba(93,184,138,0.1);
+  box-shadow: 0 0 0 3px rgba(93,184,138,0.12);
+}
+[data-theme="dark"] .role-option-label               { color: #B8C4D8; }
+[data-theme="dark"] .role-option.active .role-option-label { color: #74CFA0; }
+
+[data-theme="dark"] .login-hint {
+  background-color: rgba(93,184,138,0.08);
+  border-color: rgba(93,184,138,0.2);
+  color: #74CFA0;
+}
+
+/* ── Recharts ────────────────────────────────────────────────────────── */
+[data-theme="dark"] .recharts-cartesian-grid line { stroke: #1E3050 !important; }
+[data-theme="dark"] .recharts-text                { fill:  #7A8FAA !important; }
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
+[data-theme="dark"] ::-webkit-scrollbar             { width: 8px; }
+[data-theme="dark"] ::-webkit-scrollbar-track       { background-color: #0D1829; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb       { background-color: #1E3050; border-radius: 4px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background-color: #2A4070; }

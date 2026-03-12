@@ -1,14 +1,18 @@
+// frontend-ui/src/App.jsx  v4 — adds ThemeProvider
 import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import Login            from "./pages/Login";
-import Register         from "./pages/Register";
-import TeacherDashboard from "./pages/TeacherDashboard";
-import StudentDashboard from "./pages/StudentDashboard";
-import History          from "./pages/History";
-import Settings         from "./pages/Settings";
-import { isAuthenticated, isTeacher } from "./services/auth";
+import Login              from "./pages/Login";
+import Register           from "./pages/Register";
+import LandingPage        from "./pages/LandingPage";
+import TeacherDashboard   from "./pages/TeacherDashboard";
+import StudentDashboard   from "./pages/StudentDashboard";
+import History            from "./pages/History";
+import Settings           from "./pages/Settings";
+import { ThemeProvider }  from "./context/ThemeContext";
+import { isAuthenticated, isTeacher, isStudent } from "./services/auth";
 import "./App.css";
 
+// ── Loading Screen ─────────────────────────────────────────────────
 function LoadingScreen({ onDone }) {
   const [exiting, setExiting] = useState(false);
   useEffect(() => {
@@ -33,9 +37,10 @@ function LoadingScreen({ onDone }) {
   );
 }
 
+// ── Page progress bar ──────────────────────────────────────────────
 function PageProgress() {
   const location = useLocation();
-  const [width, setWidth]   = useState(0);
+  const [width,   setWidth]   = useState(0);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     setVisible(true); setWidth(0);
@@ -49,36 +54,36 @@ function PageProgress() {
     <div className="page-progress-bar" style={{
       width: `${width}%`, opacity: visible ? 1 : 0,
       transition: width === 0 ? "none" : "width 0.35s ease, opacity 0.25s ease",
-    }} />
+    }}/>
   );
 }
 
+// ── Route guards ───────────────────────────────────────────────────
 function PrivateRoute({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" replace />;
 }
-
 function PublicRoute({ children }) {
   return !isAuthenticated() ? children : <Navigate to="/dashboard" replace />;
 }
-
-// Redirect /dashboard → correct dashboard based on role
 function DashboardRouter() {
-  return isTeacher()
-    ? <TeacherDashboard />
-    : <StudentDashboard />;
+  if (isTeacher()) return <TeacherDashboard />;
+  if (isStudent()) return <StudentDashboard />;
+  return <Navigate to="/login" replace />;
 }
 
+// ── App shell ──────────────────────────────────────────────────────
 function AppShell() {
   return (
     <>
       <PageProgress />
       <Routes>
-        <Route path="/login"    element={<PublicRoute><Login    /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/"          element={<LandingPage />} />
+        <Route path="/login"     element={<PublicRoute><Login    /></PublicRoute>} />
+        <Route path="/register"  element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/dashboard" element={<PrivateRoute><DashboardRouter /></PrivateRoute>} />
-        <Route path="/history"   element={<PrivateRoute><History   /></PrivateRoute>} />
-        <Route path="/settings"  element={<PrivateRoute><Settings  /></PrivateRoute>} />
-        <Route path="*" element={<Navigate to={isAuthenticated() ? "/dashboard" : "/login"} replace />} />
+        <Route path="/history"   element={<PrivateRoute><History  /></PrivateRoute>} />
+        <Route path="/settings"  element={<PrivateRoute><Settings /></PrivateRoute>} />
+        <Route path="*"          element={<Navigate to={isAuthenticated() ? "/dashboard" : "/"} replace />} />
       </Routes>
     </>
   );
@@ -87,9 +92,11 @@ function AppShell() {
 export default function App() {
   const [loaded, setLoaded] = useState(false);
   return (
-    <BrowserRouter>
-      {!loaded && <LoadingScreen onDone={() => setLoaded(true)} />}
-      {loaded   && <AppShell />}
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        {!loaded && <LoadingScreen onDone={() => setLoaded(true)} />}
+        {loaded   && <AppShell />}
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

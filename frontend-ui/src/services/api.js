@@ -1,4 +1,4 @@
-// frontend-ui/src/services/api.js  v3
+// frontend-ui/src/services/api.js  v4
 const BASE = "http://127.0.0.1:8000";
 
 function authHeaders() {
@@ -38,3 +38,13 @@ export const getSessionHistory      = (user, role)      => {
   if (role) p.append("role",role);
   return req("GET",`/session-history?${p}`);
 };
+
+// ── Student history & delete (v4 — Teacher Dashboard) ─────────────
+export const getStudentHistory = (studentId) =>
+  req("GET", `/student-history/${studentId}`);
+
+export const deleteStudentSessionHistory = (studentId, sessionId) =>
+  req("DELETE", `/student-history/${studentId}/session/${sessionId}`);
+
+export const deleteAllStudentHistory = (studentId) =>
+  req("DELETE", `/student-history/${studentId}/all`);

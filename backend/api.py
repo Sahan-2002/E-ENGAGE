@@ -1,4 +1,4 @@
-"""backend/api.py  v6 — adds engagement record collection"""
+"""backend/api.py  v7 — adds student history & delete endpoints"""
 
 import sys, os
 sys.path.append(os.path.dirname(__file__))
@@ -15,7 +15,7 @@ from database   import User, Class, Session as ClassSession, EngagementRecord, c
 from auth_utils import hash_password, verify_password, create_token, decode_token
 from services.ml.session_runner import run_session, session_state, reset_session_state, HISTORY_CSV
 
-app = FastAPI(title="E-ENGAGE API", version="6.0")
+app = FastAPI(title="E-ENGAGE API", version="7.0")
 app.add_middleware(CORSMiddleware,
     allow_origins=["http://localhost:3000"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"])
@@ -137,7 +137,7 @@ def class_session_status(class_id: int, db: DBSession = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════════════
-# ENGAGEMENT RECORDS  — NEW
+# ENGAGEMENT RECORDS
 # ══════════════════════════════════════════════════════════════════
 
 @app.post("/submit-engagement")
@@ -147,14 +147,12 @@ def submit_engagement(req: SubmitEngagementRequest,
     """Student submits their score after each 20-second cycle."""
     if cu.role != "student": raise HTTPException(403, "Students only")
 
-    # Allow submission even if session just ended (grace period)
     session = db.query(ClassSession).filter(ClassSession.session_id == req.session_id).first()
     if not session: raise HTTPException(404, "Session not found")
 
-    # Prevent duplicate submission for same cycle
     existing = db.query(EngagementRecord).filter(
-        EngagementRecord.session_id  == req.session_id,
-        EngagementRecord.student_id  == cu.id,
+        EngagementRecord.session_id   == req.session_id,
+        EngagementRecord.student_id   == cu.id,
         EngagementRecord.cycle_number == req.cycle_number,
     ).first()
     if existing:
@@ -189,7 +187,6 @@ def get_class_engagement(class_id: int,
                .filter(EngagementRecord.session_id.in_(session_ids))
                .order_by(EngagementRecord.timestamp).all())
 
-    # Aggregate per student
     student_map = {}
     for r in records:
         sid = r.student_id
@@ -230,6 +227,110 @@ def get_student_engagement(session_id: Optional[int] = None,
                         "label":r.label,"timestamp":r.timestamp.isoformat()} for r in records]}
 
 
+# ══════════════════════════════════════════════════════════════════
+# STUDENT HISTORY & DELETE  — NEW in v7
+# ══════════════════════════════════════════════════════════════════
+
+@app.get("/student-history/{student_id}")
+def get_student_history(student_id: int,
+                         cu: User = Depends(get_current_user),
+                         db: DBSession = Depends(get_db)):
+    """Teacher: full engagement history for a specific student across all sessions."""
+    if cu.role != "teacher": raise HTTPException(403, "Teachers only")
+
+    student = db.query(User).filter(User.id == student_id, User.role == "student").first()
+    if not student: raise HTTPException(404, "Student not found")
+
+    records = (db.query(EngagementRecord)
+               .filter(EngagementRecord.student_id == student_id)
+               .order_by(EngagementRecord.timestamp).all())
+
+    # Group by session
+    session_map = {}
+    for r in records:
+        sid = r.session_id
+        if sid not in session_map:
+            session_map[sid] = {
+                "session_id": sid,
+                "class_id":   r.session.class_id,
+                "class_name": r.session.cls.class_name,
+                "start_time": r.session.start_time.isoformat(),
+                "scores": [], "labels": [], "timeline": [],
+            }
+        session_map[sid]["scores"].append(r.engagement_score)
+        session_map[sid]["labels"].append(r.label)
+        session_map[sid]["timeline"].append({
+            "record_id": r.record_id,
+            "cycle":     r.cycle_number,
+            "score":     r.engagement_score,
+            "label":     r.label,
+            "timestamp": r.timestamp.isoformat(),
+        })
+
+    sessions = []
+    for sid, d in session_map.items():
+        avg     = round(sum(d["scores"]) / len(d["scores"]), 1)
+        engaged = sum(1 for l in d["labels"] if l == "Engaged")
+        overall = ("Highly Engaged" if avg >= 70 else
+                   "Moderately Engaged" if avg >= 50 else "Disengaged")
+        sessions.append({
+            "session_id":    sid,
+            "class_id":      d["class_id"],
+            "class_name":    d["class_name"],
+            "start_time":    d["start_time"],
+            "avg_score":     avg,
+            "total_cycles":  len(d["scores"]),
+            "engaged_cycles":engaged,
+            "overall_label": overall,
+            "timeline":      d["timeline"],
+        })
+
+    sessions.sort(key=lambda x: x["start_time"], reverse=True)
+    return {
+        "student_id":    student_id,
+        "student_name":  student.name,
+        "total_sessions":len(sessions),
+        "total_records": len(records),
+        "sessions":      sessions,
+    }
+
+
+@app.delete("/student-history/{student_id}/session/{session_id}")
+def delete_student_session_history(student_id: int,
+                                    session_id: int,
+                                    cu: User = Depends(get_current_user),
+                                    db: DBSession = Depends(get_db)):
+    """Teacher: delete all engagement records for a student in one session."""
+    if cu.role != "teacher": raise HTTPException(403, "Teachers only")
+
+    records = (db.query(EngagementRecord)
+               .filter(EngagementRecord.student_id == student_id,
+                       EngagementRecord.session_id == session_id).all())
+    if not records: raise HTTPException(404, "No records found for this student/session")
+
+    count = len(records)
+    for r in records: db.delete(r)
+    db.commit()
+    return {"status":"deleted","student_id":student_id,
+            "session_id":session_id,"records_deleted":count}
+
+
+@app.delete("/student-history/{student_id}/all")
+def delete_all_student_history(student_id: int,
+                                 cu: User = Depends(get_current_user),
+                                 db: DBSession = Depends(get_db)):
+    """Teacher: delete ALL engagement records for a student across all sessions."""
+    if cu.role != "teacher": raise HTTPException(403, "Teachers only")
+
+    records = (db.query(EngagementRecord)
+               .filter(EngagementRecord.student_id == student_id).all())
+
+    count = len(records)
+    for r in records: db.delete(r)
+    db.commit()
+    return {"status":"deleted","student_id":student_id,"records_deleted":count}
+
+
 # ── Monitoring loop (CV/HCI) ───────────────────────────────────────
 @app.post("/start-monitoring")
 def start_monitoring(req: MonitoringRequest):
@@ -266,4 +367,4 @@ def get_session_history(user: str = None, role: str = None):
     return {"sessions":rows}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.0"}
+def health(): return {"status":"ok","version":"7.0"}
