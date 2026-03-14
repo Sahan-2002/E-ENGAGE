@@ -84,7 +84,9 @@ export default function History() {
     : "—";
   const bestSession    = sessions.reduce((best, s) =>
     (parseFloat(s.avg_score) > parseFloat(best?.avg_score || 0)) ? s : best, null);
-  const engagedSessions= sessions.filter(s => parseFloat(s.avg_score) >= 70).length;
+  const activeLedSessions = sessions.filter(
+    s => (parseInt(s.active_count, 10) || 0) >= Math.max(parseInt(s.passive_count, 10) || 0, parseInt(s.disengaged_count, 10) || 0)
+  ).length;
 
   return (
     <div className="main-content">
@@ -137,8 +139,8 @@ export default function History() {
                 color: parseFloat(avgOverall) >= 70 ? "var(--success)" : parseFloat(avgOverall) >= 50 ? "var(--warning)" : "var(--danger)",
               },
               {
-                label: "Engaged Sessions",
-                value: `${engagedSessions} / ${totalSessions}`,
+                label: "Active Sessions",
+                value: `${activeLedSessions} / ${totalSessions}`,
                 icon: <Award size={18}/>,
                 color: "var(--success)",
               },
@@ -247,7 +249,8 @@ export default function History() {
                     <th>Duration</th>
                     <th>Cycles</th>
                     <th>Avg Score</th>
-                    <th>Engaged</th>
+                    <th>Active</th>
+                    <th>Passive</th>
                     <th>Disengaged</th>
                     <th>Result</th>
                   </tr>
@@ -316,7 +319,16 @@ export default function History() {
                             padding: "3px 10px", borderRadius: 20,
                             fontWeight: 700, fontSize: "0.82rem",
                           }}>
-                            {s.engaged_count}
+                            {s.active_count ?? 0}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <span style={{
+                            background: "rgba(245,158,11,0.1)", color: "var(--warning)",
+                            padding: "3px 10px", borderRadius: 20,
+                            fontWeight: 700, fontSize: "0.82rem",
+                          }}>
+                            {s.passive_count ?? 0}
                           </span>
                         </td>
                         <td style={{ textAlign: "center" }}>

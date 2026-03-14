@@ -1,13 +1,23 @@
-session_id,user,role,date,time,duration_minutes,total_cycles,avg_score,engaged_count,disengaged_count,label_summary
-56FEE75E,teacher@eengage.com,teacher,2026-03-10,11:10,2.2,2,54.7,1,1,Moderately Engaged
-6C3EFB42,student@eengage.com,student,2026-03-10,11:48,0.7,1,55.43,1,0,Moderately Engaged
-37BDF198,unknown,student,2026-03-10,19:13,0.8,1,54.28,1,0,Moderately Engaged
-DE61C69C,donald@gmail.com,student,2026-03-10,21:33,0.7,1,63.04,1,0,Moderately Engaged
-7A65AC58,donald@gmail.com,student,2026-03-10,22:41,0.7,1,57.03,0,1,Moderately Engaged
-9E12A809,donald@gmail.com,student,2026-03-10,22:50,6.2,5,39.47,1,4,Disengaged
-54FD0436,subodha@gmail.com,student,2026-03-10,23:43,2.5,2,49.8,0,2,Disengaged
-0C8DFFB7,donald@gmail.com,student,2026-03-11,00:27,10.1,8,54.9,2,6,Moderately Engaged
-DCF79E0F,jhone@gmail.com,student,2026-03-11,00:31,1.3,1,58.04,0,1,Moderately Engaged
-FE61F32E,donald@gmail.com,student,2026-03-11,10:14,6.2,5,50.03,1,4,Moderately Engaged
-936B81DC,jhone@gmail.com,student,2026-03-12,17:59,1.2,1,36.05,0,1,Disengaged
-3ABC2191,jhone@gmail.com,student,2026-03-12,23:36,1.3,1,13.48,0,1,Disengaged
+session_id,user,role,date,time,duration_minutes,total_cycles,avg_score,active_count,passive_count,disengaged_count,label_summary
+56FEE75E,teacher@eengage.com,teacher,2026-03-10,11:10,2.2,2,54.7,1,0,1,Moderately Engaged
+6C3EFB42,student@eengage.com,student,2026-03-10,11:48,0.7,1,55.43,1,0,0,Moderately Engaged
+37BDF198,unknown,student,2026-03-10,19:13,0.8,1,54.28,1,0,0,Moderately Engaged
+DE61C69C,donald@gmail.com,student,2026-03-10,21:33,0.7,1,63.04,1,0,0,Moderately Engaged
+7A65AC58,donald@gmail.com,student,2026-03-10,22:41,0.7,1,57.03,0,0,1,Moderately Engaged
+9E12A809,donald@gmail.com,student,2026-03-10,22:50,6.2,5,39.47,1,0,4,Disengaged
+54FD0436,subodha@gmail.com,student,2026-03-10,23:43,2.5,2,49.8,0,0,2,Disengaged
+0C8DFFB7,donald@gmail.com,student,2026-03-11,00:27,10.1,8,54.9,2,0,6,Moderately Engaged
+DCF79E0F,jhone@gmail.com,student,2026-03-11,00:31,1.3,1,58.04,0,0,1,Moderately Engaged
+FE61F32E,donald@gmail.com,student,2026-03-11,10:14,6.2,5,50.03,1,0,4,Moderately Engaged
+936B81DC,jhone@gmail.com,student,2026-03-12,17:59,1.2,1,36.05,0,0,1,Disengaged
+3ABC2191,jhone@gmail.com,student,2026-03-12,23:36,1.3,1,13.48,0,0,1,Disengaged
+C0467D71,jhone@gmail.com,student,2026-03-13,13:16,6.6,5,47.59,3,0,2,Highly Engaged
+741CBBD4,jhone@gmail.com,student,2026-03-13,13:18,1.4,1,70.46,1,0,0,Highly Engaged
+80FDA61F,jhone@gmail.com,student,2026-03-13,14:09,9.3,7,37.91,3,0,4,Disengaged
+56DAB716,jhone@gmail.com,student,2026-03-13,20:28,20.0,15,61.63,12,0,3,Highly Engaged
+534CB745,jhone@gmail.com,student,2026-03-13,20:33,3.5,3,31.24,1,0,2,Disengaged
+E9510110,jhone@gmail.com,student,2026-03-14,15:19,3.4,3,35.72,1,0,2,Disengaged
+53DD36B9,jhone@gmail.com,student,2026-03-14,15:21,0.8,1,19.25,0,0,1,Disengaged
+6DBAABA1,jhone@gmail.com,student,2026-03-14,15:24,1.8,2,45.03,1,0,1,Highly Engaged
+D5D4213C,duke@gmail.com,student,2026-03-14,15:48,10.2,8,50.97,5,0,3,Highly Engaged
+E64598C7,duke@gmail.com,student,2026-03-14,16:09,2.3,2,37.91,1,0,1,Highly Engaged

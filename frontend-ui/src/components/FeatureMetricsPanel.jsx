@@ -53,7 +53,7 @@ export default function FeatureMetricsPanel({ features = {} }) {
         icon={<Monitor size={14} />}
         label="Head Pose Stability"
         value={head_pose}
-        color="var(--purple)"
+        color="var(--sage)"
       />
 
       <div className="divider" style={{ margin: "16px 0" }} />

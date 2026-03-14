@@ -61,13 +61,26 @@ export default function StudentDashboard() {
   const classPollRef      = useRef(null);
   const monitorPollRef    = useRef(null);
   const countdownRef      = useRef(null);
-  const monitoringStarted = useRef(false);   // gate: only call startMonitoring once
-  const submittedCycles   = useRef(new Set()); // which cycles were already submitted
+  const dropdownRef       = useRef(null);   // NEW: for click-outside detection
+  const monitoringStarted = useRef(false);
+  const submittedCycles   = useRef(new Set());
   const teacherSessionRef = useRef(null);
   const userRef           = useRef(user);
 
-  useEffect(() => { userRef.current       = user;           }, [user]);
+  useEffect(() => { userRef.current          = user;           }, [user]);
   useEffect(() => { teacherSessionRef.current = teacherSession; }, [teacherSession]);
+
+  // ── Close dropdown on click outside ────────────────────────────
+  useEffect(() => {
+    if (!showDrop) return;
+    function handleClick(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDrop(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showDrop]);
 
   // Load classes once
   useEffect(() => {
@@ -86,7 +99,6 @@ export default function StudentDashboard() {
         setLocalPhase(data.phase || "idle");
         setLocalSecs(data.secs_left || 0);
 
-        // Submit each new completed cycle exactly once
         const samples = data.all_samples || [];
         for (const sample of samples) {
           const cycle = sample.cycle;
@@ -107,7 +119,6 @@ export default function StudentDashboard() {
               );
               setSubmittedCount(n => n + 1);
             } catch (e) {
-              // 409 already_recorded is fine — just skip
               if (!e.message?.includes("already_recorded")) {
                 console.warn("Submit failed:", e.message);
               }
@@ -131,7 +142,6 @@ export default function StudentDashboard() {
     clearInterval(classPollRef.current);
     clearInterval(monitorPollRef.current);
 
-    // Reset everything for this new class
     monitoringStarted.current = false;
     submittedCycles.current.clear();
     setTeacherSession(null);
@@ -149,7 +159,7 @@ export default function StudentDashboard() {
           setBackendError("");
 
           if (!monitoringStarted.current) {
-            monitoringStarted.current = true;   // set BEFORE await to prevent double-call
+            monitoringStarted.current = true;
             try {
               await startMonitoring(
                 userRef.current?.email || "student",
@@ -222,54 +232,91 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* Class selector */}
-        <div className="card fade-up" style={{marginBottom:20,padding:"16px 20px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+        {/* ── Class selector ── */}
+        {/*
+          FIX: The card's box-shadow creates a stacking context that traps
+          child z-index values. We pull the dropdown's wrapper OUT of the
+          card's overflow by using overflow:visible on the card row, and
+          set zIndex:9999 on the dropdown panel itself so it floats above
+          everything including the navbar (z-index:100).
+        */}
+        <div className={`card fade-up student-class-selector-card${showDrop ? " open" : ""}`} style={{marginBottom:20,padding:"16px 20px",overflow:"visible"}}>
+          <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap",overflow:"visible"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <BookOpen size={15} style={{color:"var(--sage)"}}/>
               <span style={{fontSize:"0.88rem",fontWeight:600,color:"var(--text-secondary)"}}>Joined class:</span>
             </div>
-            <div style={{position:"relative"}}>
-              <button onClick={() => setShowDrop(v => !v)} style={{
-                display:"flex",alignItems:"center",gap:10,
-                padding:"9px 14px",borderRadius:"var(--radius-sm)",
-                border:"1.5px solid var(--border)",background:"white",
-                cursor:"pointer",fontSize:"0.9rem",fontWeight:600,
-                color:"var(--navy)",minWidth:240,
-              }}>
+
+            {/* Dropdown wrapper — ref used for click-outside */}
+            <div ref={dropdownRef} className="student-class-selector" style={{position:"relative"}}>
+              <button
+                className="class-selector-btn"
+                onClick={() => setShowDrop(v => !v)}
+                style={{
+                  display:"flex",alignItems:"center",gap:10,
+                  padding:"9px 14px",borderRadius:"var(--radius-sm)",
+                  border:"1.5px solid var(--border)",background:"white",
+                  cursor:"pointer",fontSize:"0.9rem",fontWeight:600,
+                  color:"var(--navy)",minWidth:240,
+                }}>
                 <span style={{flex:1,textAlign:"left"}}>
                   {selectedClass ? selectedClass.class_name : "Select a class..."}
                 </span>
-                <ChevronDown size={14} style={{color:"var(--text-muted)",flexShrink:0}}/>
+                <ChevronDown
+                  size={14}
+                  style={{
+                    color:"var(--text-muted)",flexShrink:0,
+                    transform: showDrop ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                />
               </button>
+
               {showDrop && (
-                <div style={{
+                <div className="class-selector-dropdown" style={{
                   position:"absolute",top:"calc(100% + 6px)",left:0,
                   background:"white",border:"1px solid var(--border)",
-                  borderRadius:"var(--radius)",boxShadow:"var(--shadow-lg)",
-                  minWidth:260,zIndex:50,
+                  borderRadius:"var(--radius)",
+                  boxShadow:"0 12px 40px rgba(15,31,61,0.18)",
+                  minWidth:260,
+                  zIndex:9999,   // FIX: high enough to escape all stacking contexts
                 }}>
-                  {classes.length === 0
-                    ? <div style={{padding:"16px",fontSize:"0.85rem",color:"var(--text-muted)"}}>No classes yet.</div>
-                    : classes.map(cls => (
-                        <button key={cls.class_id}
-                          onClick={() => { setSelectedClass(cls); setShowDrop(false); }}
-                          style={{
-                            display:"block",width:"100%",textAlign:"left",
-                            padding:"11px 16px",border:"none",background:"none",
-                            cursor:"pointer",fontSize:"0.88rem",fontWeight:500,
-                            color:"var(--text-primary)",borderBottom:"1px solid var(--border-light)",
-                          }}>
-                          {cls.class_name}
-                          <span style={{marginLeft:8,fontSize:"0.75rem",color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>
-                            #{cls.class_id}
-                          </span>
-                        </button>
-                      ))
-                  }
+                  {classes.length === 0 ? (
+                    <div style={{padding:"16px",fontSize:"0.85rem",color:"var(--text-muted)"}}>
+                      No classes yet.
+                    </div>
+                  ) : (
+                    classes.map((cls, idx) => (
+                      <button
+                        key={cls.class_id}
+                        onClick={() => { setSelectedClass(cls); setShowDrop(false); }}
+                        style={{
+                          display:"block",width:"100%",textAlign:"left",
+                          padding:"11px 16px",border:"none",
+                          background: selectedClass?.class_id === cls.class_id
+                            ? "rgba(61,122,95,0.06)" : "none",
+                          cursor:"pointer",fontSize:"0.88rem",fontWeight:500,
+                          color: selectedClass?.class_id === cls.class_id
+                            ? "var(--sage)" : "var(--text-primary)",
+                          borderBottom: idx < classes.length - 1
+                            ? "1px solid var(--border-light)" : "none",
+                          borderRadius: idx === 0 ? "var(--radius) var(--radius) 0 0"
+                            : idx === classes.length - 1 ? "0 0 var(--radius) var(--radius)" : "0",
+                        }}>
+                        {cls.class_name}
+                        <span style={{
+                          marginLeft:8,fontSize:"0.75rem",
+                          color:"var(--text-muted)",fontFamily:"var(--font-mono)",
+                        }}>
+                          #{cls.class_id}
+                        </span>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>
+
             {teacherSession && (
               <span style={{
                 display:"inline-flex",alignItems:"center",gap:6,
@@ -327,7 +374,6 @@ export default function StudentDashboard() {
         {/* Active monitoring */}
         {teacherSession && (
           <>
-            {/* Status bar */}
             <div className="card fade-up" style={{marginBottom:16,padding:"16px 20px"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
                 <div style={{display:"flex",alignItems:"center",gap:16}}>

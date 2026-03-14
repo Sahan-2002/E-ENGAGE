@@ -203,12 +203,15 @@ def get_class_engagement(class_id: int,
     summary = []
     for sid, d in student_map.items():
         avg     = round(sum(d["scores"]) / len(d["scores"]), 1)
-        engaged = sum(1 for l in d["labels"] if l == "Engaged")
+        active = sum(1 for l in d["labels"] if l == "Active Engagement")
+        passive = sum(1 for l in d["labels"] if l == "Passive Engagement")
+        disengaged = sum(1 for l in d["labels"] if l == "Disengaged")
         overall = ("Highly Engaged" if avg >= 70 else
                    "Moderately Engaged" if avg >= 50 else "Disengaged")
         summary.append({"student_id":sid,"student_name":d["student_name"],
                         "avg_score":avg,"total_cycles":len(d["scores"]),
-                        "engaged_cycles":engaged,"overall_label":overall,
+                        "active_cycles":active,"passive_cycles":passive,
+                        "disengaged_cycles":disengaged,"overall_label":overall,
                         "timeline":d["timeline"]})
     summary.sort(key=lambda x: x["avg_score"], reverse=True)
     return {"class_id":class_id,"summary":summary,"total_records":len(records)}
@@ -270,7 +273,9 @@ def get_student_history(student_id: int,
     sessions = []
     for sid, d in session_map.items():
         avg     = round(sum(d["scores"]) / len(d["scores"]), 1)
-        engaged = sum(1 for l in d["labels"] if l == "Engaged")
+        active = sum(1 for l in d["labels"] if l == "Active Engagement")
+        passive = sum(1 for l in d["labels"] if l == "Passive Engagement")
+        disengaged = sum(1 for l in d["labels"] if l == "Disengaged")
         overall = ("Highly Engaged" if avg >= 70 else
                    "Moderately Engaged" if avg >= 50 else "Disengaged")
         sessions.append({
@@ -280,7 +285,9 @@ def get_student_history(student_id: int,
             "start_time":    d["start_time"],
             "avg_score":     avg,
             "total_cycles":  len(d["scores"]),
-            "engaged_cycles":engaged,
+            "active_cycles": active,
+            "passive_cycles": passive,
+            "disengaged_cycles": disengaged,
             "overall_label": overall,
             "timeline":      d["timeline"],
         })

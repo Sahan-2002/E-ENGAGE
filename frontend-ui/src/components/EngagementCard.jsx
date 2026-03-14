@@ -6,8 +6,8 @@ export default function EngagementCard({ score = 0, confidence = 0, label = "—
   const offset = circumference - (score / 100) * circumference;
 
   const color =
-    score >= 70 ? "var(--success)" :
-    score >= 45 ? "var(--warning)" :
+    label === "Active Engagement" ? "var(--success)" :
+    label === "Passive Engagement" ? "var(--warning)" :
     "var(--danger)";
 
   return (

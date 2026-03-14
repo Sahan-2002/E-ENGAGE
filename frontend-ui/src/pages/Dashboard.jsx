@@ -7,7 +7,7 @@ import { getUser, isTeacher } from "../services/auth";
 import { startSession, stopSession, getSessionStatus } from "../services/api";
 import {
   Play, Square, Clock, CheckCircle, AlertCircle,
-  Trophy, BarChart2, Timer, Wifi, WifiOff, Activity
+  Trophy, Timer, Wifi, WifiOff, Activity
 } from "lucide-react";
 
 const POLL_MS      = 1000;
@@ -164,11 +164,11 @@ function SessionSummary({ summary, onNewSession }) {
 
       {/* Stats grid */}
       <div className="grid-4" style={{ marginBottom: 20 }}>
-        {[
-          { label: "Engaged",    value: `${summary.engaged_count} / ${summary.total_cycles}`,      icon: <CheckCircle size={16}/>, color: "var(--success)" },
-          { label: "Disengaged", value: `${summary.disengaged_count} / ${summary.total_cycles}`,   icon: <AlertCircle size={16}/>, color: "var(--danger)"  },
-          { label: "Best Cycle", value: `#${summary.best_cycle}  ${summary.best_score}%`,          icon: <Trophy size={16}/>,      color: "var(--primary)" },
-          { label: "Low Point",  value: `#${summary.worst_cycle}  ${summary.worst_score}%`,        icon: <BarChart2 size={16}/>,   color: "var(--warning)" },
+        {[ 
+          { label: "Active",      value: `${summary.active_count} / ${summary.total_cycles}`,       icon: <CheckCircle size={16}/>, color: "var(--success)" },
+          { label: "Passive",     value: `${summary.passive_count} / ${summary.total_cycles}`,      icon: <Clock size={16}/>,       color: "var(--warning)" },
+          { label: "Disengaged",  value: `${summary.disengaged_count} / ${summary.total_cycles}`,   icon: <AlertCircle size={16}/>, color: "var(--danger)"  },
+          { label: "Best Cycle",  value: `#${summary.best_cycle}  ${summary.best_score}%`,         icon: <Trophy size={16}/>,      color: "var(--primary)" },
         ].map((s, i) => (
           <div key={i} className="card" style={{ borderTop: `3px solid ${s.color}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
