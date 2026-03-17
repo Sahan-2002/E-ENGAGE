@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import { getUser, isTeacher } from "../services/auth";
 import { getSessionHistory } from "../services/api";
@@ -40,7 +40,8 @@ export default function History() {
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
 
-  async function loadHistory() {
+  // useCallback makes loadHistory stable so it can be a useEffect dependency
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -51,9 +52,9 @@ export default function History() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user?.email, user?.role]);
 
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   function exportCSV() {
     if (!sessions.length) return;
@@ -69,7 +70,6 @@ export default function History() {
     URL.revokeObjectURL(url);
   }
 
-  // Chart data — chronological order (oldest first)
   const chartData = [...sessions].reverse().map((s, i) => ({
     index: i + 1,
     label: `#${i + 1}`,
@@ -77,7 +77,6 @@ export default function History() {
     date:  s.date || "",
   }));
 
-  // Summary stats
   const totalSessions  = sessions.length;
   const avgOverall     = totalSessions > 0
     ? (sessions.reduce((sum, s) => sum + (parseFloat(s.avg_score) || 0), 0) / totalSessions).toFixed(1)
@@ -93,7 +92,6 @@ export default function History() {
       <Navbar />
       <div className="page-body">
 
-        {/* ── Header ── */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: 24 }}>
           <div>
             <h1 className="page-title">Session History</h1>
@@ -111,7 +109,6 @@ export default function History() {
           </div>
         </div>
 
-        {/* ── Error ── */}
         {error && (
           <div style={{
             background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
@@ -122,34 +119,14 @@ export default function History() {
           </div>
         )}
 
-        {/* ── Summary stats ── */}
         {!loading && sessions.length > 0 && (
           <div className="grid-4" style={{ marginBottom: 20 }}>
             {[
-              {
-                label: "Total Sessions",
-                value: totalSessions,
-                icon: <Activity size={18}/>,
-                color: "var(--primary)",
-              },
-              {
-                label: "Average Score",
-                value: `${avgOverall}%`,
-                icon: <TrendingUp size={18}/>,
-                color: parseFloat(avgOverall) >= 70 ? "var(--success)" : parseFloat(avgOverall) >= 50 ? "var(--warning)" : "var(--danger)",
-              },
-              {
-                label: "Active Sessions",
-                value: `${activeLedSessions} / ${totalSessions}`,
-                icon: <Award size={18}/>,
-                color: "var(--success)",
-              },
-              {
-                label: "Best Score",
-                value: bestSession ? `${parseFloat(bestSession.avg_score).toFixed(1)}%` : "—",
-                icon: <Clock size={18}/>,
-                color: "var(--accent)",
-              },
+              { label: "Total Sessions", value: totalSessions,  icon: <Activity size={18}/>, color: "var(--primary)" },
+              { label: "Average Score",  value: `${avgOverall}%`, icon: <TrendingUp size={18}/>,
+                color: parseFloat(avgOverall) >= 70 ? "var(--success)" : parseFloat(avgOverall) >= 50 ? "var(--warning)" : "var(--danger)" },
+              { label: "Active Sessions", value: `${activeLedSessions} / ${totalSessions}`, icon: <Award size={18}/>, color: "var(--success)" },
+              { label: "Best Score", value: bestSession ? `${parseFloat(bestSession.avg_score).toFixed(1)}%` : "—", icon: <Clock size={18}/>, color: "var(--accent)" },
             ].map((s, i) => (
               <div key={i} className="card fade-up" style={{ borderTop: `3px solid ${s.color}` }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
@@ -165,7 +142,6 @@ export default function History() {
           </div>
         )}
 
-        {/* ── Trend chart ── */}
         {chartData.length > 1 && (
           <div className="card fade-up" style={{ marginBottom: 20 }}>
             <div className="card-header">
@@ -192,12 +168,8 @@ export default function History() {
                 />
                 <ReferenceLine y={70} stroke="var(--success)" strokeDasharray="4 4" strokeOpacity={0.5} />
                 <ReferenceLine y={50} stroke="var(--warning)" strokeDasharray="4 4" strokeOpacity={0.4} />
-                <Line
-                  type="monotone" dataKey="score"
-                  stroke="url(#lineGrad2)" strokeWidth={2.5}
-                  dot={{ r:4, fill:"var(--primary)", strokeWidth:0 }}
-                  activeDot={{ r:6 }}
-                />
+                <Line type="monotone" dataKey="score" stroke="url(#lineGrad2)" strokeWidth={2.5}
+                  dot={{ r:4, fill:"var(--primary)", strokeWidth:0 }} activeDot={{ r:6 }} />
               </LineChart>
             </ResponsiveContainer>
             <div style={{ display:"flex", gap:16, justifyContent:"flex-end", marginTop:8, fontSize:"0.75rem", color:"var(--text-muted)" }}>
@@ -207,7 +179,6 @@ export default function History() {
           </div>
         )}
 
-        {/* ── Table ── */}
         <div className="card fade-up-2">
           <div className="card-header">
             <div className="card-title">
@@ -215,20 +186,14 @@ export default function History() {
             </div>
           </div>
 
-          {/* Empty state */}
           {!loading && sessions.length === 0 && (
             <div style={{ textAlign:"center", padding:"56px 24px", color:"var(--text-muted)" }}>
               <Activity size={36} style={{ margin:"0 auto 14px", opacity:0.25 }} />
-              <div style={{ fontFamily:"var(--font-display)", fontWeight:700, fontSize:"1rem", marginBottom:8 }}>
-                No Sessions Yet
-              </div>
-              <div style={{ fontSize:"0.88rem" }}>
-                Start a monitoring session from the Dashboard to record your first session.
-              </div>
+              <div style={{ fontFamily:"var(--font-display)", fontWeight:700, fontSize:"1rem", marginBottom:8 }}>No Sessions Yet</div>
+              <div style={{ fontSize:"0.88rem" }}>Start a monitoring session from the Dashboard to record your first session.</div>
             </div>
           )}
 
-          {/* Loading state */}
           {loading && (
             <div style={{ textAlign:"center", padding:"48px 24px", color:"var(--text-muted)", fontSize:"0.88rem" }}>
               <RefreshCw size={24} className="spin" style={{ margin:"0 auto 12px" }} />
@@ -236,7 +201,6 @@ export default function History() {
             </div>
           )}
 
-          {/* Table */}
           {!loading && sessions.length > 0 && (
             <div className="table-wrapper">
               <table>
@@ -257,92 +221,30 @@ export default function History() {
                 </thead>
                 <tbody>
                   {sessions.map((s, i) => {
-                    const score   = parseFloat(s.avg_score) || 0;
-                    const color   = scoreColor(score);
-                    const duration= parseFloat(s.duration_minutes) || 0;
-                    const durLabel= duration < 1
-                      ? `${Math.round(duration * 60)}s`
-                      : `${duration.toFixed(1)} min`;
-
+                    const score    = parseFloat(s.avg_score) || 0;
+                    const color    = scoreColor(score);
+                    const duration = parseFloat(s.duration_minutes) || 0;
+                    const durLabel = duration < 1 ? `${Math.round(duration * 60)}s` : `${duration.toFixed(1)} min`;
                     return (
                       <tr key={i}>
-                        <td>
-                          <span style={{
-                            fontFamily: "monospace", fontSize: "0.8rem",
-                            color: "var(--primary)", fontWeight: 600,
-                          }}>
-                            {s.session_id}
-                          </span>
-                        </td>
-                        {teacher && (
-                          <td style={{ fontSize: "0.83rem", color: "var(--text-secondary)" }}>
-                            {s.user}
-                          </td>
-                        )}
-                        <td style={{ fontSize: "0.85rem" }}>{s.date}</td>
-                        <td style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>{s.time}</td>
-                        <td>
-                          <span style={{
-                            background: "var(--bg)", padding: "3px 8px",
-                            borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
-                            color: "var(--text-secondary)",
-                          }}>
-                            {durLabel}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: "center" }}>
-                          <span style={{
-                            fontFamily: "var(--font-display)", fontWeight: 800,
-                            fontSize: "0.95rem", color: "var(--text-primary)",
-                          }}>
-                            {s.total_cycles}
-                          </span>
-                        </td>
+                        <td><span style={{ fontFamily:"monospace", fontSize:"0.8rem", color:"var(--primary)", fontWeight:600 }}>{s.session_id}</span></td>
+                        {teacher && <td style={{ fontSize:"0.83rem", color:"var(--text-secondary)" }}>{s.user}</td>}
+                        <td style={{ fontSize:"0.85rem" }}>{s.date}</td>
+                        <td style={{ fontSize:"0.85rem", color:"var(--text-muted)" }}>{s.time}</td>
+                        <td><span style={{ background:"var(--bg)", padding:"3px 8px", borderRadius:6, fontSize:"0.8rem", fontWeight:600, color:"var(--text-secondary)" }}>{durLabel}</span></td>
+                        <td style={{ textAlign:"center" }}><span style={{ fontFamily:"var(--font-display)", fontWeight:800, fontSize:"0.95rem", color:"var(--text-primary)" }}>{s.total_cycles}</span></td>
                         <td>
                           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                            <div className="progress-bar" style={{ width: 72, flex: "none" }}>
-                              <div className="progress-fill" style={{
-                                width: `${Math.min(score, 100)}%`,
-                                background: color,
-                              }} />
+                            <div className="progress-bar" style={{ width:72, flex:"none" }}>
+                              <div className="progress-fill" style={{ width:`${Math.min(score,100)}%`, background:color }} />
                             </div>
-                            <strong style={{
-                              color, fontFamily: "var(--font-display)", fontSize: "0.9rem",
-                            }}>
-                              {score.toFixed(1)}%
-                            </strong>
+                            <strong style={{ color, fontFamily:"var(--font-display)", fontSize:"0.9rem" }}>{score.toFixed(1)}%</strong>
                           </div>
                         </td>
-                        <td style={{ textAlign: "center" }}>
-                          <span style={{
-                            background: "rgba(16,185,129,0.1)", color: "var(--success)",
-                            padding: "3px 10px", borderRadius: 20,
-                            fontWeight: 700, fontSize: "0.82rem",
-                          }}>
-                            {s.active_count ?? 0}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: "center" }}>
-                          <span style={{
-                            background: "rgba(245,158,11,0.1)", color: "var(--warning)",
-                            padding: "3px 10px", borderRadius: 20,
-                            fontWeight: 700, fontSize: "0.82rem",
-                          }}>
-                            {s.passive_count ?? 0}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: "center" }}>
-                          <span style={{
-                            background: "rgba(239,68,68,0.1)", color: "var(--danger)",
-                            padding: "3px 10px", borderRadius: 20,
-                            fontWeight: 700, fontSize: "0.82rem",
-                          }}>
-                            {s.disengaged_count}
-                          </span>
-                        </td>
-                        <td>
-                          <ResultBadge label={s.label_summary} />
-                        </td>
+                        <td style={{ textAlign:"center" }}><span style={{ background:"rgba(16,185,129,0.1)", color:"var(--success)", padding:"3px 10px", borderRadius:20, fontWeight:700, fontSize:"0.82rem" }}>{s.active_count ?? 0}</span></td>
+                        <td style={{ textAlign:"center" }}><span style={{ background:"rgba(245,158,11,0.1)", color:"var(--warning)", padding:"3px 10px", borderRadius:20, fontWeight:700, fontSize:"0.82rem" }}>{s.passive_count ?? 0}</span></td>
+                        <td style={{ textAlign:"center" }}><span style={{ background:"rgba(239,68,68,0.1)", color:"var(--danger)", padding:"3px 10px", borderRadius:20, fontWeight:700, fontSize:"0.82rem" }}>{s.disengaged_count}</span></td>
+                        <td><ResultBadge label={s.label_summary} /></td>
                       </tr>
                     );
                   })}
@@ -351,7 +253,6 @@ export default function History() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

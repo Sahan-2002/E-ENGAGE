@@ -18,7 +18,7 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      const data = await login(email, password);
+      await login(email, password);  // removed unused 'data' variable
       navigate("/dashboard");
     } catch (err) {
       setError(err.message || "Invalid credentials. Please try again.");
@@ -36,7 +36,6 @@ export default function Login() {
   return (
     <div className="login-page">
 
-      {/* ── Left brand panel ── */}
       <div className="login-brand-panel">
         <div className="login-brand-content">
           <div className="login-wordmark">
@@ -60,14 +59,12 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── Right form panel ── */}
       <div className="login-form-panel">
         <div className="login-form-box fade-up">
 
           <div className="login-form-title">Welcome back</div>
           <div className="login-form-sub">Sign in to your E-ENGAGE account</div>
 
-          {/* Error */}
           {error && (
             <div style={{
               background: "rgba(192,57,43,0.07)", border: "1px solid rgba(192,57,43,0.2)",
@@ -123,14 +120,9 @@ export default function Login() {
             </button>
           </form>
 
-          <div style={{
-            marginTop: 22, textAlign: "center",
-            fontSize: "0.85rem", color: "var(--text-muted)",
-          }}>
+          <div style={{ marginTop: 22, textAlign: "center", fontSize: "0.85rem", color: "var(--text-muted)" }}>
             Don't have an account?{" "}
-            <Link to="/register" style={{
-              color: "var(--navy)", fontWeight: 600, textDecoration: "none",
-            }}>
+            <Link to="/register" style={{ color: "var(--navy)", fontWeight: 600, textDecoration: "none" }}>
               Create one
             </Link>
           </div>

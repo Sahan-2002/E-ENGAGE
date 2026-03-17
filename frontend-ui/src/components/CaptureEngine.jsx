@@ -56,10 +56,6 @@ export default function CaptureEngine({
   const mouseCountRef = useRef(0);
   const lastActiveRef = useRef(Date.now());
 
-  // Latest CV result from MediaPipe callback
-  const cvResultRef   = useRef({
-    face_detected: 0, eye_openness: 0.0, head_pose: 0,
-  });
   const cvResolveRef  = useRef(null);  // resolves the per-frame promise
 
   // ── HCI event listeners ──────────────────────────────────────────
@@ -209,8 +205,6 @@ export default function CaptureEngine({
     while (runningRef.current) {
       // ── Tracking phase ─────────────────────────────────────────
       onPhaseChange("tracking");
-      const cycleStart = Date.now();
-
       // Count down CYCLE_SECONDS
       for (let s = CYCLE_SECONDS; s > 0; s--) {
         if (!runningRef.current) break;
