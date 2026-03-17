@@ -221,13 +221,13 @@ export default function StudentDashboard() {
         )}
 
         {/* Class selector */}
-        <div className="card fade-up" style={{ marginBottom:20,padding:"16px 20px",overflow:"visible" }}>
-          <div style={{ display:"flex",alignItems:"center",gap:16,flexWrap:"wrap",overflow:"visible" }}>
+        <div className={`card fade-up student-class-selector-card${showDrop ? " open" : ""}`} style={{ marginBottom:20, padding:"16px 20px" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:16,flexWrap:"wrap" }}>
             <div style={{ display:"flex",alignItems:"center",gap:8 }}>
               <BookOpen size={15} style={{ color:"var(--sage)" }}/>
               <span style={{ fontSize:"0.88rem",fontWeight:600,color:"var(--text-secondary)" }}>Joined class:</span>
             </div>
-            <div ref={dropdownRef} style={{ position:"relative" }}>
+            <div ref={dropdownRef} className="student-class-selector">
               <button onClick={() => setShowDrop(v => !v)} style={{
                 display:"flex",alignItems:"center",gap:10,padding:"9px 14px",
                 borderRadius:"var(--radius-sm)",border:"1.5px solid var(--border)",
@@ -240,16 +240,14 @@ export default function StudentDashboard() {
                 <ChevronDown size={14} style={{ color:"var(--text-muted)",flexShrink:0,transform:showDrop?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s ease" }}/>
               </button>
               {showDrop && (
-                <div style={{ position:"absolute",top:"calc(100% + 6px)",left:0,background:"white",border:"1px solid var(--border)",borderRadius:"var(--radius)",boxShadow:"0 12px 40px rgba(15,31,61,0.18)",minWidth:260,zIndex:9999 }}>
+                <div className="class-selector-dropdown">
                   {classes.length === 0
                     ? <div style={{ padding:"16px",fontSize:"0.85rem",color:"var(--text-muted)" }}>No classes yet.</div>
                     : classes.map((cls,idx) => (
                       <button key={cls.class_id} onClick={() => { setSelectedClass(cls); setShowDrop(false); }} style={{
-                        display:"block",width:"100%",textAlign:"left",padding:"11px 16px",border:"none",
-                        background:selectedClass?.class_id===cls.class_id?"rgba(61,122,95,0.06)":"none",
-                        cursor:"pointer",fontSize:"0.88rem",fontWeight:500,
-                        color:selectedClass?.class_id===cls.class_id?"var(--sage)":"var(--text-primary)",
                         borderBottom:idx<classes.length-1?"1px solid var(--border-light)":"none",
+                        background:selectedClass?.class_id===cls.class_id?"rgba(61,122,95,0.06)":"none",
+                        color:selectedClass?.class_id===cls.class_id?"var(--sage)":"var(--text-primary)",
                       }}>
                         {cls.class_name}
                         <span style={{ marginLeft:8,fontSize:"0.75rem",color:"var(--text-muted)",fontFamily:"var(--font-mono)" }}>#{cls.class_id}</span>
@@ -275,7 +273,7 @@ export default function StudentDashboard() {
 
         {/* Waiting */}
         {!teacherSession && (
-          <div className="card fade-up" style={{ textAlign:"center",padding:"72px 24px",background:"linear-gradient(160deg,var(--cream),var(--cream-dark))",position:"relative",zIndex:0 }}>
+          <div className="card fade-up" style={{ textAlign:"center",padding:"72px 24px",background:"linear-gradient(160deg,var(--cream),var(--cream-dark))" }}>
             <div style={{ width:72,height:72,borderRadius:"50%",background:"rgba(15,31,61,0.06)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px" }}>
               <Clock size={32} style={{ color:"var(--navy)",opacity:0.35 }}/>
             </div>

@@ -605,25 +605,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
      Any card that specifically needs clipping should add it inline. */
 }
 
-.student-class-selector-card {
-  position: relative;
-  z-index: 1;
-  isolation: isolate;
-}
-
-.student-class-selector-card.open {
-  z-index: 1200;
-}
-
-.student-class-selector {
-  position: relative;
-  z-index: 2;
-}
-
-.class-selector-dropdown {
-  z-index: 1300;
-}
-
 .card-header {
   display: flex;
   align-items: flex-start;
@@ -818,6 +799,55 @@ html.theme-ready button, html.theme-ready a, html.theme-ready .btn {
 .recharts-wrapper,
 .recharts-responsive-container {
   min-width: 0 !important;
+}
+
+/* ── Student class selector — stacking context fix ─────────────────
+   When the dropdown is open (.open), lift the entire card above
+   all sibling cards so the absolutely-positioned dropdown panel
+   is never clipped by a later sibling's stacking context.
+   ─────────────────────────────────────────────────────────────── */
+.student-class-selector-card {
+  position: relative;
+  z-index: 1;
+  overflow: visible !important;
+}
+
+.student-class-selector-card.open {
+  z-index: 200;   /* above all sibling cards including the waiting panel */
+}
+
+.student-class-selector {
+  position: relative;
+  z-index: 201;
+}
+
+.class-selector-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 9999;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(15,31,61,0.18);
+  min-width: 260px;
+}
+
+.class-selector-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.class-selector-dropdown button:last-child {
+  border-bottom: none;
 }
 
 /* ── Dark mode: student class selector dropdown ─────────────────── */
