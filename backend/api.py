@@ -1,4 +1,4 @@
-"""backend/api.py  v8 — deployment ready + settings endpoints"""
+"""backend/api.py  v9 — browser capture + deployment ready"""
 
 import sys, os
 sys.path.append(os.path.dirname(__file__))
@@ -13,12 +13,11 @@ from sqlalchemy.orm import Session as DBSession
 
 from database   import User, Class, Session as ClassSession, EngagementRecord, create_tables, get_db
 from auth_utils import hash_password, verify_password, create_token, decode_token
+from services.ml.fusion import calculate_engagement_score
 from services.ml.session_runner import run_session, session_state, reset_session_state, HISTORY_CSV
 
-app = FastAPI(title="E-ENGAGE API", version="8.0")
+app = FastAPI(title="E-ENGAGE API", version="9.0")
 
-# ── CORS — open for deployment ─────────────────────────────────────
-# allow_credentials must be False when allow_origins=["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,7 +29,7 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     create_tables()
-    print("✅ Database ready (engage.db)")
+    print("✅ Database ready")
 
 
 # ── Request models ─────────────────────────────────────────────────
@@ -54,6 +53,17 @@ class SubmitEngagementRequest(BaseModel):
     engagement_score: float
     label:            str
     cycle_number:     int = 1
+
+# ── NEW: browser sends raw features, backend scores them ──────────
+class SubmitFeaturesRequest(BaseModel):
+    session_id:     int
+    cycle_number:   int
+    face_detected:  int
+    eye_openness:   float
+    head_pose:      int
+    typing_speed:   float
+    mouse_activity: float
+    idle_time:      float
 
 class UpdateProfileRequest(BaseModel):
     name:  str
@@ -152,7 +162,70 @@ def class_session_status(class_id: int, db: DBSession = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════════════
-# ENGAGEMENT RECORDS
+# ENGAGEMENT — browser-based capture (primary production path)
+# ══════════════════════════════════════════════════════════════════
+
+@app.post("/submit-features")
+def submit_features(req: SubmitFeaturesRequest,
+                    cu: User = Depends(get_current_user),
+                    db: DBSession = Depends(get_db)):
+    """
+    Student browser sends raw CV+HCI features.
+    Backend runs fusion/XGBoost and stores the result.
+    This is the production path — no Python on student machine needed.
+    """
+    if cu.role != "student": raise HTTPException(403, "Students only")
+
+    session = db.query(ClassSession).filter(ClassSession.session_id == req.session_id).first()
+    if not session: raise HTTPException(404, "Session not found")
+
+    # Duplicate check
+    existing = db.query(EngagementRecord).filter(
+        EngagementRecord.session_id   == req.session_id,
+        EngagementRecord.student_id   == cu.id,
+        EngagementRecord.cycle_number == req.cycle_number,
+    ).first()
+    if existing:
+        return {"status":"already_recorded","record_id":existing.record_id}
+
+    # Run fusion / XGBoost on the server
+    cv  = {
+        "face_detected": req.face_detected,
+        "eye_openness":  req.eye_openness,
+        "head_pose":     req.head_pose,
+    }
+    hci = {
+        "typing_speed":   req.typing_speed,
+        "mouse_activity": req.mouse_activity,
+        "idle_time":      req.idle_time,
+    }
+    result = calculate_engagement_score(cv, hci)
+
+    record = EngagementRecord(
+        session_id       = req.session_id,
+        student_id       = cu.id,
+        timestamp        = datetime.utcnow(),
+        engagement_score = result["engagement_score"],
+        label            = result["label"],
+        cycle_number     = req.cycle_number,
+    )
+    db.add(record); db.commit(); db.refresh(record)
+
+    print(f"📊 [browser] {cu.name} | cycle={req.cycle_number} | "
+          f"{result['engagement_score']:.1f}% | {result['label']} | src={result['score_source']}")
+
+    return {
+        "status":           "recorded",
+        "record_id":        record.record_id,
+        "engagement_score": result["engagement_score"],
+        "label":            result["label"],
+        "confidence":       result["confidence"],
+        "score_source":     result["score_source"],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+# ENGAGEMENT — legacy submit (local Python monitoring)
 # ══════════════════════════════════════════════════════════════════
 
 @app.post("/submit-engagement")
@@ -176,16 +249,13 @@ def submit_engagement(req: SubmitEngagementRequest,
         label=req.label, cycle_number=req.cycle_number,
     )
     db.add(record); db.commit(); db.refresh(record)
-    print(f"📊 {cu.name} | cycle={req.cycle_number} | {req.engagement_score:.1f}% | {req.label}")
     return {"status":"recorded","record_id":record.record_id,
             "student":cu.name,"score":record.engagement_score,"label":record.label}
 
 
 @app.get("/class-engagement/{class_id}")
-def get_class_engagement(class_id: int,
-                          session_id: Optional[int] = None,
-                          cu: User = Depends(get_current_user),
-                          db: DBSession = Depends(get_db)):
+def get_class_engagement(class_id: int, session_id: Optional[int] = None,
+                          cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if cu.role != "teacher": raise HTTPException(403, "Teachers only")
     sessions_q = db.query(ClassSession).filter(ClassSession.class_id == class_id)
     if session_id: sessions_q = sessions_q.filter(ClassSession.session_id == session_id)
@@ -212,8 +282,7 @@ def get_class_engagement(class_id: int,
         active     = sum(1 for l in d["labels"] if l == "Active Engagement")
         passive    = sum(1 for l in d["labels"] if l == "Passive Engagement")
         disengaged = sum(1 for l in d["labels"] if l == "Disengaged")
-        overall    = ("Highly Engaged" if avg >= 70 else
-                      "Moderately Engaged" if avg >= 50 else "Disengaged")
+        overall    = ("Highly Engaged" if avg >= 70 else "Moderately Engaged" if avg >= 50 else "Disengaged")
         summary.append({"student_id":sid,"student_name":d["student_name"],
                         "avg_score":avg,"total_cycles":len(d["scores"]),
                         "active_cycles":active,"passive_cycles":passive,
@@ -225,8 +294,7 @@ def get_class_engagement(class_id: int,
 
 @app.get("/student-engagement")
 def get_student_engagement(session_id: Optional[int] = None,
-                            cu: User = Depends(get_current_user),
-                            db: DBSession = Depends(get_db)):
+                            cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     q = db.query(EngagementRecord).filter(EngagementRecord.student_id == cu.id)
     if session_id: q = q.filter(EngagementRecord.session_id == session_id)
     records = q.order_by(EngagementRecord.timestamp).all()
@@ -240,89 +308,57 @@ def get_student_engagement(session_id: Optional[int] = None,
 # ══════════════════════════════════════════════════════════════════
 
 @app.get("/student-history/{student_id}")
-def get_student_history(student_id: int,
-                         cu: User = Depends(get_current_user),
-                         db: DBSession = Depends(get_db)):
+def get_student_history(student_id: int, cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if cu.role != "teacher": raise HTTPException(403, "Teachers only")
     student = db.query(User).filter(User.id == student_id, User.role == "student").first()
     if not student: raise HTTPException(404, "Student not found")
-    records = (db.query(EngagementRecord)
-               .filter(EngagementRecord.student_id == student_id)
+    records = (db.query(EngagementRecord).filter(EngagementRecord.student_id == student_id)
                .order_by(EngagementRecord.timestamp).all())
     session_map = {}
     for r in records:
         sid = r.session_id
         if sid not in session_map:
-            session_map[sid] = {
-                "session_id": sid,
-                "class_id":   r.session.class_id,
-                "class_name": r.session.cls.class_name,
-                "start_time": r.session.start_time.isoformat(),
-                "scores": [], "labels": [], "timeline": [],
-            }
+            session_map[sid] = {"session_id":sid,"class_id":r.session.class_id,
+                                "class_name":r.session.cls.class_name,
+                                "start_time":r.session.start_time.isoformat(),
+                                "scores":[],"labels":[],"timeline":[]}
         session_map[sid]["scores"].append(r.engagement_score)
         session_map[sid]["labels"].append(r.label)
-        session_map[sid]["timeline"].append({
-            "record_id": r.record_id,
-            "cycle":     r.cycle_number,
-            "score":     r.engagement_score,
-            "label":     r.label,
-            "timestamp": r.timestamp.isoformat(),
-        })
+        session_map[sid]["timeline"].append({"record_id":r.record_id,"cycle":r.cycle_number,
+                                             "score":r.engagement_score,"label":r.label,
+                                             "timestamp":r.timestamp.isoformat()})
     sessions = []
     for sid, d in session_map.items():
         avg        = round(sum(d["scores"]) / len(d["scores"]), 1)
         active     = sum(1 for l in d["labels"] if l == "Active Engagement")
         passive    = sum(1 for l in d["labels"] if l == "Passive Engagement")
         disengaged = sum(1 for l in d["labels"] if l == "Disengaged")
-        overall    = ("Highly Engaged" if avg >= 70 else
-                      "Moderately Engaged" if avg >= 50 else "Disengaged")
-        sessions.append({
-            "session_id":        sid,
-            "class_id":          d["class_id"],
-            "class_name":        d["class_name"],
-            "start_time":        d["start_time"],
-            "avg_score":         avg,
-            "total_cycles":      len(d["scores"]),
-            "active_cycles":     active,
-            "passive_cycles":    passive,
-            "disengaged_cycles": disengaged,
-            "overall_label":     overall,
-            "timeline":          d["timeline"],
-        })
+        overall    = ("Highly Engaged" if avg >= 70 else "Moderately Engaged" if avg >= 50 else "Disengaged")
+        sessions.append({"session_id":sid,"class_id":d["class_id"],"class_name":d["class_name"],
+                         "start_time":d["start_time"],"avg_score":avg,"total_cycles":len(d["scores"]),
+                         "active_cycles":active,"passive_cycles":passive,"disengaged_cycles":disengaged,
+                         "overall_label":overall,"timeline":d["timeline"]})
     sessions.sort(key=lambda x: x["start_time"], reverse=True)
-    return {
-        "student_id":     student_id,
-        "student_name":   student.name,
-        "total_sessions": len(sessions),
-        "total_records":  len(records),
-        "sessions":       sessions,
-    }
-
+    return {"student_id":student_id,"student_name":student.name,
+            "total_sessions":len(sessions),"total_records":len(records),"sessions":sessions}
 
 @app.delete("/student-history/{student_id}/session/{session_id}")
 def delete_student_session_history(student_id: int, session_id: int,
-                                    cu: User = Depends(get_current_user),
-                                    db: DBSession = Depends(get_db)):
+                                    cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if cu.role != "teacher": raise HTTPException(403, "Teachers only")
     records = (db.query(EngagementRecord)
-               .filter(EngagementRecord.student_id == student_id,
-                       EngagementRecord.session_id  == session_id).all())
-    if not records: raise HTTPException(404, "No records found for this student/session")
+               .filter(EngagementRecord.student_id==student_id,
+                       EngagementRecord.session_id==session_id).all())
+    if not records: raise HTTPException(404, "No records found")
     count = len(records)
     for r in records: db.delete(r)
     db.commit()
-    return {"status":"deleted","student_id":student_id,
-            "session_id":session_id,"records_deleted":count}
-
+    return {"status":"deleted","student_id":student_id,"session_id":session_id,"records_deleted":count}
 
 @app.delete("/student-history/{student_id}/all")
-def delete_all_student_history(student_id: int,
-                                 cu: User = Depends(get_current_user),
-                                 db: DBSession = Depends(get_db)):
+def delete_all_student_history(student_id: int, cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if cu.role != "teacher": raise HTTPException(403, "Teachers only")
-    records = (db.query(EngagementRecord)
-               .filter(EngagementRecord.student_id == student_id).all())
+    records = db.query(EngagementRecord).filter(EngagementRecord.student_id==student_id).all()
     count = len(records)
     for r in records: db.delete(r)
     db.commit()
@@ -334,26 +370,17 @@ def delete_all_student_history(student_id: int,
 # ══════════════════════════════════════════════════════════════════
 
 @app.put("/update-profile")
-def update_profile(req: UpdateProfileRequest,
-                   cu: User = Depends(get_current_user),
-                   db: DBSession = Depends(get_db)):
+def update_profile(req: UpdateProfileRequest, cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if not req.name.strip():  raise HTTPException(400, "Name cannot be empty")
     if not req.email.strip(): raise HTTPException(400, "Email cannot be empty")
-    existing = db.query(User).filter(
-        User.email == req.email.lower().strip(),
-        User.id    != cu.id
-    ).first()
-    if existing: raise HTTPException(409, "Email already in use by another account")
-    cu.name  = req.name.strip()
-    cu.email = req.email.lower().strip()
+    existing = db.query(User).filter(User.email==req.email.lower().strip(), User.id!=cu.id).first()
+    if existing: raise HTTPException(409, "Email already in use")
+    cu.name=req.name.strip(); cu.email=req.email.lower().strip()
     db.commit(); db.refresh(cu)
     return {"status":"updated","name":cu.name,"email":cu.email}
 
-
 @app.put("/change-password")
-def change_password_endpoint(req: ChangePasswordRequest,
-                              cu: User = Depends(get_current_user),
-                              db: DBSession = Depends(get_db)):
+def change_password_endpoint(req: ChangePasswordRequest, cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if not verify_password(req.current_password, cu.password_hash):
         raise HTTPException(400, "Current password is incorrect")
     if len(req.new_password) < 6:
@@ -362,35 +389,26 @@ def change_password_endpoint(req: ChangePasswordRequest,
     db.commit()
     return {"status":"password_changed"}
 
-
 @app.delete("/delete-all-my-data")
-def delete_all_my_data(cu: User = Depends(get_current_user),
-                        db: DBSession = Depends(get_db)):
+def delete_all_my_data(cu: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if cu.role != "teacher": raise HTTPException(403, "Teachers only")
-    classes   = db.query(Class).filter(Class.teacher_id == cu.id).all()
+    classes   = db.query(Class).filter(Class.teacher_id==cu.id).all()
     class_ids = [c.class_id for c in classes]
     if not class_ids: return {"status":"nothing_to_delete"}
     sessions    = db.query(ClassSession).filter(ClassSession.class_id.in_(class_ids)).all()
     session_ids = [s.session_id for s in sessions]
     records_deleted = 0
     if session_ids:
-        records = db.query(EngagementRecord).filter(
-            EngagementRecord.session_id.in_(session_ids)
-        ).all()
+        records = db.query(EngagementRecord).filter(EngagementRecord.session_id.in_(session_ids)).all()
         records_deleted = len(records)
         for r in records: db.delete(r)
-    sessions_deleted = len(sessions)
     for s in sessions: db.delete(s)
     db.commit()
-    return {
-        "status":           "deleted",
-        "classes_affected": len(class_ids),
-        "sessions_deleted": sessions_deleted,
-        "records_deleted":  records_deleted,
-    }
+    return {"status":"deleted","classes_affected":len(class_ids),
+            "sessions_deleted":len(sessions),"records_deleted":records_deleted}
 
 
-# ── Monitoring loop (CV/HCI) ───────────────────────────────────────
+# ── Local Python monitoring (kept for local dev/testing only) ──────
 @app.post("/start-monitoring")
 def start_monitoring(req: MonitoringRequest):
     if session_state["running"]: return {"status":"already_running"}
@@ -426,4 +444,4 @@ def get_session_history(user: str = None, role: str = None):
     return {"sessions":rows}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"8.0"}
+def health(): return {"status":"ok","version":"9.0"}

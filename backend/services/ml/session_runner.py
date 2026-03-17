@@ -99,21 +99,21 @@ def _run_single_cycle(cycle_num):
     fusion = calculate_engagement_score(cv, hci)
 
     features_display = {
-        "eye_openness": round(normalize(cv.get("eye_openness", 0), 0.0, 0.05), 2),
-        "head_pose": round(float(cv.get("head_pose", 0)), 2),
-        "typing_speed": round(normalize(hci["typing_speed"], 0, 200), 2),
-        "mouse_activity": round(normalize(hci["mouse_activity"], 0, 60), 2),
-        "idle_time": round(normalize(hci["idle_time"], 0, 20), 2),
+        "eye_openness": float(round(normalize(cv.get("eye_openness", 0), 0.0, 0.05), 2)),
+        "head_pose": float(round(float(cv.get("head_pose", 0)), 2)),
+        "typing_speed": float(round(normalize(hci["typing_speed"], 0, 200), 2)),
+        "mouse_activity": float(round(normalize(hci["mouse_activity"], 0, 60), 2)),
+        "idle_time": float(round(normalize(hci["idle_time"], 0, 20), 2)),
     }
 
     sample = {
         "cycle": cycle_num,
         "timestamp": int(time.time()),
-        "engagement_score": fusion["engagement_score"],
+        "engagement_score": float(fusion["engagement_score"]),
         "label": fusion["label"],
-        "confidence": fusion["confidence"],
+        "confidence": float(fusion["confidence"]),
         "features": features_display,
-        "face_detected": cv.get("face_detected", 0),
+        "face_detected": int(cv.get("face_detected", 0)),
     }
 
     print(f"Cycle {cycle_num} result: {sample['engagement_score']}% | {sample['label']}")
