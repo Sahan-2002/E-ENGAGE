@@ -275,7 +275,7 @@ export default function StudentDashboard() {
 
         {/* Waiting */}
         {!teacherSession && (
-          <div className="card fade-up" style={{ textAlign:"center",padding:"72px 24px",background:"linear-gradient(160deg,var(--cream),var(--cream-dark))" }}>
+          <div className="card fade-up" style={{ textAlign:"center",padding:"72px 24px",background:"linear-gradient(160deg,var(--cream),var(--cream-dark))",position:"relative",zIndex:0 }}>
             <div style={{ width:72,height:72,borderRadius:"50%",background:"rgba(15,31,61,0.06)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px" }}>
               <Clock size={32} style={{ color:"var(--navy)",opacity:0.35 }}/>
             </div>
