@@ -809,28 +809,34 @@ html.theme-ready button, html.theme-ready a, html.theme-ready .btn {
 .student-class-selector-card {
   position: relative;
   z-index: 1;
+  isolation: isolate;
   overflow: visible !important;
 }
 
 .student-class-selector-card.open {
-  z-index: 200;   /* above all sibling cards including the waiting panel */
+  z-index: 5000;   /* keep the whole card above later sibling cards */
 }
 
 .student-class-selector {
   position: relative;
-  z-index: 201;
+  z-index: 5001;
 }
 
 .class-selector-dropdown {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 9999;
+  z-index: 5002;
   background: white;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 12px 40px rgba(15,31,61,0.18);
   min-width: 260px;
+}
+
+.class-selector-btn {
+  position: relative;
+  z-index: 1;
 }
 
 .class-selector-dropdown button {

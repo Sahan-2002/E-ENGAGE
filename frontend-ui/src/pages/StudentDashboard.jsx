@@ -228,7 +228,7 @@ export default function StudentDashboard() {
               <span style={{ fontSize:"0.88rem",fontWeight:600,color:"var(--text-secondary)" }}>Joined class:</span>
             </div>
             <div ref={dropdownRef} className="student-class-selector">
-              <button onClick={() => setShowDrop(v => !v)} style={{
+              <button className="class-selector-btn" onClick={() => setShowDrop(v => !v)} style={{
                 display:"flex",alignItems:"center",gap:10,padding:"9px 14px",
                 borderRadius:"var(--radius-sm)",border:"1.5px solid var(--border)",
                 background:"white",cursor:"pointer",fontSize:"0.9rem",fontWeight:600,
