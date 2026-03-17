@@ -1,27 +1,18 @@
-from ..hci.features import get_hci_features
-from ..cv.extract_features import get_cv_features
-
 # backend/services/ml/fusion.py  v3
-# When XGBoost model is available:
-#   - Score comes from XGBoost P(Engaged) × 100
-#   - Label is derived from that score (score >= 70 → Active, >= 50 → Passive, else Disengaged)
-# When model is unavailable:
-#   - Full rule-based fallback for both score and label
+# Removed unused top-level imports of get_hci_features / get_cv_features
+# — those caused pynput crash on Railway even though they were never called.
 
 ACTIVE_LABEL     = "Active Engagement"
 PASSIVE_LABEL    = "Passive Engagement"
 DISENGAGED_LABEL = "Disengaged"
 
-# ── Thresholds ─────────────────────────────────────────────────────
 TYPING_SPEED_THRESHOLD   = 30
 MOUSE_ACTIVITY_THRESHOLD = 8
 EYE_OPENNESS_THRESHOLD   = 0.015
 IDLE_TIME_DISENGAGED     = 40
 
-# Score thresholds for label derivation from XGBoost score
-SCORE_ACTIVE   = 70   # score >= 70  → Active Engagement
-SCORE_PASSIVE  = 50   # score >= 50  → Passive Engagement
-                      # score <  50  → Disengaged
+SCORE_ACTIVE  = 70
+SCORE_PASSIVE = 50
 
 
 def normalize(value, min_val, max_val):
@@ -31,7 +22,6 @@ def normalize(value, min_val, max_val):
 
 
 def _label_from_score(score):
-    """Derive 3-state label directly from engagement score."""
     if score >= SCORE_ACTIVE:
         return ACTIVE_LABEL
     if score >= SCORE_PASSIVE:
@@ -41,7 +31,6 @@ def _label_from_score(score):
 
 def _rule_based_label(face_detected, eye_openness, head_pose,
                       typing_speed, mouse_activity):
-    """Fallback 3-state label — used only when XGBoost is unavailable."""
     if face_detected == 0:
         return DISENGAGED_LABEL
     if typing_speed > TYPING_SPEED_THRESHOLD or mouse_activity > MOUSE_ACTIVITY_THRESHOLD:
@@ -53,7 +42,6 @@ def _rule_based_label(face_detected, eye_openness, head_pose,
 
 def _rule_based_score(label, face_detected, eye_openness, head_pose,
                       typing_speed, mouse_activity, idle_time):
-    """Fallback score + confidence — used only when XGBoost is unavailable."""
     visual_attention = (
         0.45 * normalize(eye_openness, EYE_OPENNESS_THRESHOLD, 0.05)
         + 0.35 * normalize(head_pose, 0, 1)
@@ -85,17 +73,6 @@ def _rule_based_score(label, face_detected, eye_openness, head_pose,
 
 
 def calculate_engagement_score(cv, hci):
-    """
-    Hybrid inference:
-
-    XGBoost available:
-      - score  = XGBoost P(Engaged) × 100
-      - label  = derived from score (>= 70 Active, >= 50 Passive, else Disengaged)
-      - confidence = rule-based (proxy)
-
-    XGBoost unavailable:
-      - score, label, confidence = full rule-based
-    """
     face_detected  = int(cv.get("face_detected",  0))
     eye_openness   = float(cv.get("eye_openness", 0.0))
     head_pose      = int(cv.get("head_pose",      0))
@@ -103,19 +80,15 @@ def calculate_engagement_score(cv, hci):
     mouse_activity = float(hci.get("mouse_activity", 0))
     idle_time      = float(hci.get("idle_time",      0))
 
-    # ── Try XGBoost score ──────────────────────────────────────────
     xgb_score = None
     try:
         from .inference import predict_engagement_score
         xgb_score = predict_engagement_score(cv, hci)
-    except ImportError:
+    except Exception:
         pass
 
     if xgb_score is not None:
-        # Score AND label both come from XGBoost output
         label = _label_from_score(xgb_score)
-
-        # Confidence: reuse rule-based proxy
         _, confidence = _rule_based_score(
             label, face_detected, eye_openness, head_pose,
             typing_speed, mouse_activity, idle_time
@@ -127,7 +100,6 @@ def calculate_engagement_score(cv, hci):
             "score_source":     "xgboost",
         }
 
-    # ── Full rule-based fallback ───────────────────────────────────
     label = _rule_based_label(
         face_detected, eye_openness, head_pose, typing_speed, mouse_activity
     )
