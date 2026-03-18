@@ -1,15 +1,14 @@
 """
-backend/services/ml/inference.py
+backend/services/ml/inference.py  — 3-class engagement model
 
-Loads the trained XGBoost model and provides engagement score prediction.
-
-Strategy — Hybrid:
-  - XGBoost predicts P(Engaged) → used as the engagement score (× 100)
-  - Rule-based fusion.py still assigns the 3-state label (Active / Passive / Disengaged)
-  - If the model file is missing or fails to load, falls back to rule-based score silently
+Loads the trained XGBoost 3-class model and returns:
+  - label:      "Active Engagement" | "Passive Engagement" | "Disengaged"
+  - confidence: float 0.0–1.0
+  - score:      float 0–100 derived from class probabilities
 
 Feature order must match train_xgboost.py exactly:
-  face_detected, eye_openness, head_pose, typing_speed, mouse_activity, idle_time
+  face_detected, eye_openness, head_pose,
+  typing_speed, mouse_activity, idle_time
 """
 
 import os
@@ -20,9 +19,20 @@ _MODEL_PATH = os.path.join(
     os.path.dirname(__file__), "models", "engagement_xgb.pkl"
 )
 
-# ── Lazy-load the model once ───────────────────────────────────────
-_model = None
+# ── Label map — must match train_xgboost.py ────────────────────────
+# 0 → Active Engagement
+# 1 → Passive Engagement
+# 2 → Disengaged
+LABEL_NAMES = ["Active Engagement", "Passive Engagement", "Disengaged"]
+
+# Score centres for each class (used to convert probabilities → score)
+# Active ~ 85, Passive ~ 55, Disengaged ~ 20
+LABEL_SCORE_CENTRES = [85.0, 55.0, 20.0]
+
+# ── Lazy-load model ────────────────────────────────────────────────
+_model           = None
 _model_available = False
+
 
 def _load_model():
     global _model, _model_available
@@ -30,46 +40,67 @@ def _load_model():
         return
     try:
         import joblib
-        _model = joblib.load(_MODEL_PATH)
+        _model           = joblib.load(_MODEL_PATH)
         _model_available = True
-        print(f"XGBoost model loaded from {_MODEL_PATH}")
+        print(f"✅ XGBoost 3-class model loaded from {_MODEL_PATH}")
     except Exception as e:
         _model_available = False
-        print(f"WARNING: XGBoost model not available - using rule-based fallback. ({e})")
+        print(f"⚠️  XGBoost model not available — rule-based fallback active. ({e})")
+
 
 _load_model()
 
 
-def predict_engagement_score(cv: dict, hci: dict) -> float | None:
+def predict_engagement(cv: dict, hci: dict) -> dict | None:
     """
-    Returns P(Engaged) × 100 as a float score in range [5, 100],
-    or None if the model is unavailable (caller falls back to rule-based).
+    Returns a dict with:
+        label:      str   — "Active Engagement" | "Passive Engagement" | "Disengaged"
+        score:      float — 0–100 engagement score (NO hard floor/ceiling clamp)
+        confidence: float — 0.0–1.0 probability of predicted class
+
+    Returns None if model is unavailable (fusion.py falls back to rule-based).
 
     Feature vector (must match training order):
-      [face_detected, eye_openness, head_pose, typing_speed, mouse_activity, idle_time]
+        [face_detected, eye_openness, head_pose,
+         typing_speed, mouse_activity, idle_time]
     """
     if not _model_available or _model is None:
         return None
 
     try:
         features = np.array([[
-            int(cv.get("face_detected",  0)),
-            float(cv.get("eye_openness", 0.0)),
-            int(cv.get("head_pose",      0)),
-            float(hci.get("typing_speed",   0.0)),
-            float(hci.get("mouse_activity", 0.0)),
-            float(hci.get("idle_time",      0.0)),
+            int(float(cv.get("face_detected",  0))),
+            float(cv.get("eye_openness",        0.0)),
+            float(cv.get("head_pose",           0.0)),   # float, not forced int
+            float(hci.get("typing_speed",       0.0)),
+            float(hci.get("mouse_activity",     0.0)),
+            float(hci.get("idle_time",          0.0)),
         ]])
 
-        # predict_proba returns [[P(Disengaged), P(Engaged)]]
-        proba = float(_model.predict_proba(features)[0][1])   # P(Engaged)
+        # predict_proba → shape (1, 3)  [P(Active), P(Passive), P(Disengaged)]
+        proba      = _model.predict_proba(features)[0]
+        class_idx  = int(np.argmax(proba))
+        confidence = float(proba[class_idx])
+        label      = LABEL_NAMES[class_idx]
 
-        # Scale to [5, 100] — same bounds as rule-based score
-        score = float(round(max(5.0, min(proba * 100, 100.0)), 2))
-        return score
+        # Weighted score: sum of (probability × score_centre) for each class
+        # Gives a smooth continuous score rather than a hard jump
+        score = float(np.dot(proba, LABEL_SCORE_CENTRES))
+        score = round(max(0.0, min(100.0, score)), 2)
+
+        return {
+            "label":      label,
+            "score":      score,
+            "confidence": round(confidence, 4),
+            "proba":      {
+                "active":     round(float(proba[0]), 4),
+                "passive":    round(float(proba[1]), 4),
+                "disengaged": round(float(proba[2]), 4),
+            }
+        }
 
     except Exception as e:
-        print(f"WARNING: XGBoost inference error: {e}")
+        print(f"⚠️  XGBoost inference error: {e}")
         return None
 
 
