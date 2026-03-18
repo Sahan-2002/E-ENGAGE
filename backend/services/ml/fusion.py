@@ -173,3 +173,10 @@ def calculate_engagement_score(cv: dict, hci: dict) -> dict:
         "confidence":       confidence,
         "score_source":     "rules",
     }
+
+
+# ── Backward compatibility ────────────────────────────────────────
+# session_runner.py imports normalize — keep this alias so the
+# server doesn't crash on import even though session_runner is
+# never actually called in production (Railway uses CaptureEngine).
+normalize = _normalize
