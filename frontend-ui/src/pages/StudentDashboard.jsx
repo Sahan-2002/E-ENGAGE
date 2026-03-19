@@ -172,9 +172,16 @@ export default function StudentDashboard() {
 
       setSamples(prev => [...prev, sample]);
       setLatestResult(sample);
+
     } catch (e) {
-      if (!e.message?.includes("already_recorded"))
-        console.warn("Submit features failed:", e.message);
+      const msg = e.message || "";
+      if (msg.includes("Authorization") || msg.includes("401") || msg.includes("expired")) {
+        // Token missing or expired — stop capture and show clear message
+        setCaptureActive(false);
+        setBackendError("Session expired — please log out and log in again.");
+      } else if (!msg.includes("already_recorded")) {
+        console.warn("Submit features failed:", msg);
+      }
     }
   }, []);
 
@@ -233,30 +240,27 @@ export default function StudentDashboard() {
                 className="class-selector-btn"
                 onClick={() => setShowDrop(v => !v)}
                 style={{
-                display:"flex",alignItems:"center",gap:10,padding:"9px 14px",
-                borderRadius:"var(--radius-sm)",border:"1.5px solid var(--border)",
-                background:"white",cursor:"pointer",fontSize:"0.9rem",fontWeight:600,
-                color:"var(--navy)",minWidth:240,
-              }}>
+                  display:"flex",alignItems:"center",gap:10,padding:"9px 14px",
+                  borderRadius:"var(--radius-sm)",border:"1.5px solid var(--border)",
+                  background:"white",cursor:"pointer",fontSize:"0.9rem",fontWeight:600,
+                  color:"var(--navy)",minWidth:240,
+                }}>
                 <span style={{ flex:1,textAlign:"left" }}>
                   {selectedClass ? selectedClass.class_name : "Select a class..."}
                 </span>
                 <ChevronDown size={14} style={{ color:"var(--text-muted)",flexShrink:0,transform:showDrop?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s ease" }}/>
               </button>
               {showDrop && (
-                <div className="class-selector-dropdown" style={{
-                  minWidth: 260,
-                }}>
+                <div className="class-selector-dropdown" style={{ minWidth:260 }}>
                   {classes.length === 0
                     ? <div style={{ padding:"16px",fontSize:"0.85rem",color:"var(--text-muted)" }}>No classes yet.</div>
-                    : classes.map((cls,idx) => (
+                    : classes.map((cls, idx) => (
                       <button key={cls.class_id} onClick={() => { setSelectedClass(cls); setShowDrop(false); }} style={{
-                        borderBottom:idx<classes.length-1?"1px solid var(--border-light)":"none",
-                        background:selectedClass?.class_id===cls.class_id?"rgba(61,122,95,0.06)":"none",
-                        color:selectedClass?.class_id===cls.class_id?"var(--sage)":"var(--text-primary)",
+                        borderBottom: idx < classes.length - 1 ? "1px solid var(--border-light)" : "none",
+                        background:   selectedClass?.class_id === cls.class_id ? "rgba(61,122,95,0.06)" : "none",
+                        color:        selectedClass?.class_id === cls.class_id ? "var(--sage)" : "var(--text-primary)",
                       }}>
                         {cls.class_name}
-                        <span style={{ marginLeft:8,fontSize:"0.75rem",color:"var(--text-muted)",fontFamily:"var(--font-mono)" }}>#{cls.class_id}</span>
                       </button>
                     ))
                   }
