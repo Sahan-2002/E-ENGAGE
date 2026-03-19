@@ -59,8 +59,6 @@ export default function StudentDashboard() {
 
   const classPollRef      = useRef(null);
   const dropdownRef       = useRef(null);
-  const btnRef            = useRef(null);
-  const [dropPos, setDropPos] = useState({ top:0, left:0, width:0 });
   const teacherSessionRef = useRef(null);
   const submittedCycles   = useRef(new Set());
   const monitoringStarted = useRef(false);
@@ -230,13 +228,11 @@ export default function StudentDashboard() {
               <span style={{ fontSize:"0.88rem",fontWeight:600,color:"var(--text-secondary)" }}>Joined class:</span>
             </div>
             <div ref={dropdownRef} className="student-class-selector">
-              <button ref={btnRef} onClick={() => {
-                if (!showDrop && btnRef.current) {
-                  const r = btnRef.current.getBoundingClientRect();
-                  setDropPos({ top: r.bottom + 6, left: r.left, width: r.width });
-                }
-                setShowDrop(v => !v);
-              }} style={{
+              <button
+                type="button"
+                className="class-selector-btn"
+                onClick={() => setShowDrop(v => !v)}
+                style={{
                 display:"flex",alignItems:"center",gap:10,padding:"9px 14px",
                 borderRadius:"var(--radius-sm)",border:"1.5px solid var(--border)",
                 background:"white",cursor:"pointer",fontSize:"0.9rem",fontWeight:600,
@@ -249,11 +245,7 @@ export default function StudentDashboard() {
               </button>
               {showDrop && (
                 <div className="class-selector-dropdown" style={{
-                  position:"fixed",
-                  top: dropPos.top,
-                  left: dropPos.left,
-                  minWidth: Math.max(dropPos.width, 260),
-                  zIndex: 9999,
+                  minWidth: 260,
                 }}>
                   {classes.length === 0
                     ? <div style={{ padding:"16px",fontSize:"0.85rem",color:"var(--text-muted)" }}>No classes yet.</div>
